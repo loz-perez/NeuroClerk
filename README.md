@@ -4,6 +4,8 @@ NeuroClerk es un asistente para psiquiatría que responde consultas sobre intera
 
 El estado de cada fase y los próximos pasos están en [HOJA_DE_RUTA.md](HOJA_DE_RUTA.md).
 
+Qué documentos poner en la carpeta `datos` y dónde conseguirlos: [DATOS.md](DATOS.md).
+
 > **Aviso:** es una herramienta de apoyo y un proyecto en desarrollo. No reemplaza el juicio clínico ni la consulta de las fuentes originales.
 
 ## Cómo funciona
@@ -85,10 +87,13 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
 
 - `requirements.txt` tiene solo las librerías principales; `requirements-lock.txt`, las versiones exactas de todo el entorno.
 - **Cada vez que instales una librería nueva**, regenera el lock en ese momento:
+
   ```powershell
   pip freeze > requirements-lock.txt
   ```
+
 - `pip freeze` no escribe la dirección de PyTorch CPU. Después de regenerarlo, agrega esta línea **al principio** del archivo; si no, falla la instalación de `torch==...+cpu`:
+
   ```text
   --extra-index-url https://download.pytorch.org/whl/cpu
   ```
@@ -101,9 +106,11 @@ PyTorch solo calcula los embeddings, y gracias a ChromaDB eso pesa únicamente a
 
 1. Copia tus PDFs en la carpeta `datos/` con nombres claros (`FT_Litio.pdf`, no `FT_63845.pdf`), porque el modelo cita el nombre del archivo.
 2. Ejecuta:
+
    ```powershell
    python .\rag.py
    ```
+
 3. Escribe tus preguntas. Para terminar, escribe `salir`.
 
 La primera ejecución tarda varios minutos porque indexa todo. Las siguientes arrancan en segundos.
@@ -171,31 +178,33 @@ Las tablas que fallan son largas y con columnas: se parten en trozos que mezclan
 
 Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas y compara.
 
-## Documentos de prueba
+## 📚 Documentos de prueba
 
-| Archivo | Contenido | Páginas |
-| --- | --- | --- |
-| `dsm5.pdf` | DSM-5, criterios diagnósticos (escaneado con OCR) | 1000 |
-| `InteraccionesFarmacoloigicas_pr.pdf` | Introducción a las interacciones farmacológicas (SEFH) | 367 |
-| `FT_Sertralina.pdf`, `FT_Litio.pdf`, `FT_Quetiapina.pdf`, `FT_Clozapina.pdf` | Fichas técnicas de la AEMPS ([CIMA](https://cima.aemps.es)) | 15–28 c/u |
+Los PDFs no se incluyen en el repositorio por su tamaño y por derechos de autor. Cada persona debe conseguirlos y copiarlos en la carpeta `datos/`.
 
-Los PDFs no se suben al repositorio por su tamaño y por derechos de autor.
+| Archivo | Contenido | Páginas | Disponibilidad |
+| --- | --- | --- | --- |
+| `dsm5.pdf` | DSM-5, criterios diagnósticos (escaneado con OCR) | 1000 | Protegido por derechos de autor, no se puede compartir |
+| `InteraccionesFarmacoloigicas_pr.pdf` | Introducción a las interacciones farmacológicas (SEFH) | 367 | Publicación de la SEFH |
+| `FT_Sertralina.pdf`, `FT_Litio.pdf`, `FT_Quetiapina.pdf`, `FT_Clozapina.pdf` | Fichas técnicas de la AEMPS | 15–28 c/u | Públicas y gratuitas en CIMA |
 
-## Problemas encontrados y cómo se resolvieron
+### Cómo descargar las fichas técnicas de CIMA
 
-### Instalación
+Las fichas técnicas de la Agencia Española de Medicamentos (AEMPS) son públicas y se descargan gratis desde [CIMA](https://cima.aemps.es):
 
-| Problema | Causa | Solución |
-| --- | --- | --- |
-| "La ejecución de scripts está deshabilitada" | PowerShell bloquea `activate` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
-| Muchos errores de dependencias | PyTorch todavía no estaba disponible para la versión más nueva de Python | Usar Python 3.12 e instalar PyTorch CPU primero |
-| `No suitable Python runtime found` | Python 3.12 no estaba instalado | Instalarlo; puede convivir con otras versiones |
-| `cryptography>=3.1 is required for AES` | El PDF de interacciones está cifrado | `pip install cryptography` |
-| `NameError: name 'paso' is not defined` | Se borró una línea al editar | Usar el archivo completo en lugar de pegar trozos |
-| `model 'qwen3:4b' not found` | El modelo no estaba descargado | `ollama pull <modelo>`; verificar con `ollama list` |
-| Aviso "unauthenticated requests to the HF Hub" | Se consultaba Hugging Face en cada arranque | `HF_HUB_OFFLINE=1` con el modelo ya descargado |
-| El entorno dejó de funcionar al renombrar la carpeta a `NeuroClerk` | En Windows, `.venv` guarda la ruta completa de la carpeta | Borrar `.venv`, recrearlo e instalar desde el lock; volver a elegir el intérprete en VS Code |
-| `ModuleNotFoundError: No module named 'pdfplumber'` | El lock se generó antes de instalar pdfplumber | `pip install -r requirements.txt` y regenerar el lock |
+1. Entra en [cima.aemps.es](https://cima.aemps.es) y busca el principio activo (por ejemplo, *sertralina*).
+2. Elige una presentación de la lista de resultados. Cualquiera sirve, porque la información clínica es casi igual entre laboratorios.
+3. En la ficha del medicamento, abre el documento **Ficha técnica** en formato PDF y descárgalo.
+4. Renómbralo con un nombre claro, por ejemplo `FT_Sertralina.pdf`. CIMA lo descarga con el número de registro (`FT_63845.pdf`), y el nombre del archivo es lo que aparece en las citas de cada respuesta.
+5. Cópialo en `datos/` y vuelve a ejecutar `python .\rag.py`. Los archivos nuevos se indexan automáticamente.
+
+### Sobre el DSM-5
+
+El DSM-5 pertenece a la American Psychiatric Association y no se puede redistribuir. Si tienes un ejemplar en PDF con licencia propia, puedes añadirlo a `datos/` para tu uso personal. Si no, el proyecto funciona igual con las fichas técnicas y otros documentos públicos; solo no podrá responder preguntas sobre criterios diagnósticos.
+
+> Si un PDF es escaneado y no tiene capa de texto, NeuroClerk todavía no puede leerlo (falta el OCR, ver *Limitaciones conocidas*).
+
+### Problemas encontrados y cómo se resolvieron
 
 ### Calidad de la búsqueda
 

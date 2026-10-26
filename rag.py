@@ -28,7 +28,7 @@ SOLAPE = 40                    # palabras repetidas entre fragmentos
 K_POR_ARCHIVO = 3              # candidatos que se buscan en cada PDF
 MARGEN = 0.03                  # se descarta lo que esté a más de esto del mejor fragmento
 MAX_FRAGMENTOS = 8             # tope de fragmentos que llegan al modelo
-VERSION_TEXTO = 3              # súbela cada vez que cambies cómo se extrae o divide el texto
+VERSION_TEXTO = 4              # súbela cada vez que cambies cómo se extrae o divide el texto
 
 CARPETA_DATOS = "datos"
 CARPETA_DB = "chroma_db"       # aquí ChromaDB guarda los vectores en disco
@@ -268,15 +268,27 @@ def responder(pregunta):
     if MODELO_LLM.startswith("qwen3"):
         opciones_extra["think"] = False   # Qwen3: responder directo, sin "pensar en voz alta"
 
-    r = ollama.chat(
+        print("\nGenerando respuesta...", flush=True)
+    partes = []
+    for trozo in ollama.chat(
         model=MODELO_LLM,
         messages=[{"role": "user", "content": prompt}],
-        options={"num_ctx": 8192, "temperature": 0.1},   # contexto amplio y poca "creatividad"
+        options={
+            "num_ctx": 8192,
+            "temperature": 0.1,
+            "num_predict": 700,      # tope de tokens: evita respuestas interminables
+        },
+        stream=True,                 # recibe la respuesta de a poco
         **opciones_extra,
-    )
-    texto = r["message"]["content"]
+    ):
+        texto_parcial = trozo["message"]["content"]
+        partes.append(texto_parcial)
+        print(".", end="", flush=True)   # un punto por trozo: se ve que avanza
+    print()
+
+    texto = "".join(partes)
     if "</think>" in texto:
-        texto = texto.split("</think>")[-1]   # por si el modelo razona igual
+        texto = texto.split("</think>")[-1]
     return texto.strip()
 
 

@@ -1,6 +1,4 @@
-# RAG básico con PDFs
-
-Proyecto de aprendizaje de **RAG (Retrieval-Augmented Generation)**: un programa en Python que responde preguntas usando solo la información de tus PDFs y cita el archivo y la página de cada dato.
+# NeuroClerk
 
 Todo corre en local: los embeddings con `sentence-transformers`, la base vectorial con ChromaDB y el modelo de lenguaje con Ollama. No hace falta ninguna API de pago.
 
@@ -31,8 +29,8 @@ flowchart LR
 
 ## Estructura del proyecto
 
-```
-rag-basico/
+```text
+NeuroClerk/
 ├── .venv/                 # entorno virtual (no se sube a Git)
 ├── datos/                 # tus PDFs (no se suben a Git)
 ├── chroma_db/             # vectores guardados (no se sube a Git)
@@ -75,16 +73,18 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
 
 1. Copia tus PDFs en la carpeta `datos/` con nombres claros (`FT_Litio.pdf`, no `FT_63845.pdf`), porque el modelo cita el nombre del archivo.
 2. Ejecuta:
+
    ```powershell
    python .\rag.py
    ```
+
 3. Escribe tus preguntas. Para terminar, escribe `salir`.
 
 La primera ejecución tarda varios minutos porque indexa todo. Las siguientes arrancan en segundos.
 
 Para cada pregunta, el programa muestra los fragmentos usados con su puntaje de similitud, y después la respuesta:
 
-```
+```text
 Fragmentos usados:
   -> [0.909] InteraccionesFarmacoloigicas_pr.pdf, página 9: Tabla 1. Fármacos que pueden causar...
   -> [0.894] InteraccionesFarmacoloigicas_pr.pdf, página 9: de receptores), en los procesos...
@@ -122,7 +122,7 @@ Los PDFs no se suben al repositorio por su tamaño y por derechos de autor.
 
 ## Problemas encontrados y cómo se resolvieron
 
-### Instalación
+### Problemas de instalación
 
 | Problema | Causa | Solución |
 | --- | --- | --- |

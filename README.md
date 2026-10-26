@@ -1,8 +1,29 @@
 # NeuroClerk
 
-Todo corre en local: los embeddings con `sentence-transformers`, la base vectorial con ChromaDB y el modelo de lenguaje con Ollama. No hace falta ninguna API de pago.
+## Propuesta de proyecto psiquiátrico (MVP)
 
-## Cómo funciona
+NeuroClerk es un asistente local para documentación clínica y consultas farmacológicas basado en RAG. Su objetivo es ayudar a estructurar notas de evolución y responder preguntas sobre interacciones medicamentosas usando únicamente documentos locales, sin depender de servicios externos ni alucinaciones del modelo.
+
+## ✨ Descripción general
+
+- **Objetivo principal:** apoyar al psiquiatra a redactar una nota de evolución con foco en el Examen del Estado Mental.
+- **Consulta segura:** responde preguntas farmacológicas consultando solo los PDFs o fuentes locales disponibles.
+- **Privacidad:** todo se ejecuta localmente, incluyendo embeddings, vector store y modelo de lenguaje.
+- **Tecnología sugerida:** Python + Ollama + ChromaDB + RAG + Streamlit.
+
+## 🧭 Hoja de ruta
+
+- [Hoja de ruta](./Hoja%20de%20ruta.md)
+
+## 🏗️ Stack tecnológico
+
+- **Lenguaje:** Python
+- **Modelo local:** Ollama (por ejemplo `qwen3:8b` o `llama3` / `mistral`)
+- **RAG / embeddings:** `sentence-transformers` y ChromaDB
+- **Interfaz sugerida:** Streamlit
+- **Privacidad:** no se usan APIs externas para la parte clínica
+
+## 🔄 Cómo funciona
 
 ```mermaid
 flowchart LR
@@ -20,69 +41,97 @@ flowchart LR
     J --> R[Respuesta citada]
 ```
 
-1. **Cargar:** lee el texto de cada página con `pypdf` y une las palabras cortadas con guion ("dificul- tad" → "dificultad").
-2. **Tablas:** `pdfplumber` detecta las tablas y guarda cada una como un fragmento propio, con su título delante.
-3. **Dividir:** parte el texto en fragmentos de 200 palabras que se solapan 40, para no cortar una idea a la mitad.
-4. **Indexar:** convierte cada fragmento en un vector y lo guarda en ChromaDB. Solo se hace la primera vez, o cuando un PDF es nuevo o cambió.
-5. **Recuperar:** busca los 3 fragmentos más parecidos de **cada** archivo y descarta los que quedan muy por debajo del mejor.
-6. **Generar:** le pasa esos fragmentos al modelo con instrucciones de responder solo con el contexto y citar cada afirmación.
+1. **Cargar:** lee el texto de cada página con `pypdf` y reune palabras cortadas con guion (por ejemplo, `dificul-tad` → `dificultad`).
+2. **Tablas:** `pdfplumber` detecta tablas y las guarda como fragmentos propios con su título incluido.
+3. **Dividir:** convierte el texto en fragmentos de 200 palabras con solape de 40.
+4. **Indexar:** genera embeddings y los guarda en ChromaDB.
+5. **Recuperar:** busca los 3 fragmentos más parecidos de cada archivo y descarta los que queden muy por debajo del mejor.
+6. **Generar:** entrega esos fragmentos al modelo con instrucciones para responder solo con contexto y citar cada afirmación.
 
-## Estructura del proyecto
+## 📁 Estructura del proyecto
 
 ```text
 NeuroClerk/
 ├── .venv/                 # entorno virtual (no se sube a Git)
-├── datos/                 # tus PDFs (no se suben a Git)
-├── chroma_db/             # vectores guardados (no se sube a Git)
-├── rag.py                 # el programa completo
-├── requirements.txt       # librerías principales
-├── requirements-lock.txt  # versiones exactas de todo el entorno
+├── datos/                 # PDFs de referencia (no se suben a Git)
+├── chroma_db/             # vectores y metadatos guardados
+├── rag.py                 # lógica principal del proyecto
+├── requirements.txt       # dependencias principales
+├── requirements-lock.txt  # versiones exactas del entorno
 ├── .gitignore
-└── README.md
+├── Hoja de ruta.md        # plan del proyecto
+├── README.md
+└── ...
 ```
 
-## Requisitos
+## ✅ Requisitos
 
-- Windows 10/11 (también funciona en macOS y Linux cambiando los comandos de activación).
-- **Python 3.12.** Las versiones más nuevas pueden no tener todavía PyTorch disponible.
-- [Ollama](https://ollama.com) instalado y abierto.
-- Unos 16 GB de RAM para `qwen3:8b`. Con 8 GB, usa `gemma3:4b`.
-- VS Code con la extensión Python (opcional, pero recomendado).
+- Windows 10/11 (también funciona en macOS/Linux con mínimos cambios).
+- **Python 3.12**. Versiones más nuevas pueden no tener PyTorch disponible todavía.
+- [Ollama](https://ollama.com) instalado y ejecutándose.
+- 16 GB de RAM recomendados para `qwen3:8b`; con 8 GB puedes usar `gemma3:4b`.
+- VS Code con la extensión Python (opcional, pero muy recomendado).
 
-## Instalación
+## ⚙️ Instalación
 
 ```powershell
 # 1. Crear y activar el entorno virtual con Python 3.12
 py -3.12 -m venv .venv
 .venv\Scripts\activate
 
-# 2. Instalar PyTorch (versión CPU) y el resto de librerías
+# 2. Instalar dependencias
 python -m pip install --upgrade pip setuptools wheel
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install -r requirements.txt
+pip install -r requirements-lock.txt
 
-# 3. Descargar el modelo de lenguaje
+# 3. Descargar el modelo local de lenguaje
 ollama pull qwen3:8b
 ```
 
-La primera vez, comenta la línea `os.environ["HF_HUB_OFFLINE"] = "1"` al principio de `rag.py` para que pueda descargar el modelo de embeddings. Después puedes volver a activarla.
+Si `requirements-lock.txt` falla, instala primero desde `requirements.txt`:
 
-En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.venv`.
+```powershell
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+```
 
-## Uso
+### Mantener las dependencias
 
-1. Copia tus PDFs en la carpeta `datos/` con nombres claros (`FT_Litio.pdf`, no `FT_63845.pdf`), porque el modelo cita el nombre del archivo.
+- `requirements.txt` contiene las librerías principales.
+- `requirements-lock.txt` conserva las versiones exactas del entorno.
+- Cuando agregues nuevas librerías, genera el lock nuevamente:
+
+```powershell
+pip freeze > requirements-lock.txt
+```
+
+- `pip freeze` no incluye la URL de PyTorch CPU. Por eso, después de regenerar el archivo, agrega esta línea al principio:
+
+```text
+--extra-index-url https://download.pytorch.org/whl/cpu
+```
+
+### ¿Por qué PyTorch CPU?
+
+PyTorch solo se usa para crear embeddings. La respuesta final la genera Ollama usando su propio runtime local. La versión CPU pesa menos que CUDA y evita depender de una GPU NVIDIA.
+
+La primera vez, puede ser necesario comentar la línea `os.environ["HF_HUB_OFFLINE"] = "1"` al inicio de `rag.py` para que descargue el modelo de embeddings. Después puedes volver a activarla.
+
+En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → seleccionar el intérprete `.venv`.
+
+## ▶️ Uso
+
+1. Copia tus PDFs en la carpeta `datos/` con nombres claros (`FT_Litio.pdf`, no `FT_63845.pdf`).
 2. Ejecuta:
 
-   ```powershell
-   python .\rag.py
-   ```
+```powershell
+python .\rag.py
+```
 
-3. Escribe tus preguntas. Para terminar, escribe `salir`.
+3. Escribe tus preguntas. Para salir, escribe `salir`.
 
-La primera ejecución tarda varios minutos porque indexa todo. Las siguientes arrancan en segundos.
+La primera ejecución puede tardar varios minutos porque indexa el contenido. Las siguientes se ejecutan mucho más rápido.
 
-Para cada pregunta, el programa muestra los fragmentos usados con su puntaje de similitud, y después la respuesta:
+Ejemplo de salida:
 
 ```text
 Fragmentos usados:
@@ -93,24 +142,24 @@ Respuesta:
 ...
 ```
 
-## Configuración
+## 🧪 Configuración
 
 Todo se ajusta en el bloque 0 de `rag.py`:
 
 | Variable | Valor actual | Para qué sirve |
 | --- | --- | --- |
 | `MODELO_LLM` | `qwen3:8b` | Modelo de Ollama que redacta la respuesta |
-| `MODELO_EMBEDDINGS` | `intfloat/multilingual-e5-base` | Modelo que convierte texto en vectores |
+| `MODELO_EMBEDDINGS` | `intfloat/multilingual-e5-base` | Modelo de embeddings |
 | `TAM_CHUNK` | `200` | Palabras por fragmento |
-| `SOLAPE` | `40` | Palabras repetidas entre fragmentos seguidos |
-| `K_POR_ARCHIVO` | `3` | Candidatos que se buscan en cada PDF |
-| `MARGEN` | `0.03` | Se descartan los fragmentos que quedan más de esto por debajo del mejor |
-| `MAX_FRAGMENTOS` | `8` | Tope de fragmentos que llegan al modelo |
-| `VERSION_TEXTO` | `3` | Súbela cada vez que cambies cómo se extrae o se divide el texto |
+| `SOLAPE` | `40` | Solapamiento entre fragmentos |
+| `K_POR_ARCHIVO` | `3` | Candidatos buscados por cada PDF |
+| `MARGEN` | `0.03` | Umbral para filtrar fragmentos |
+| `MAX_FRAGMENTOS` | `8` | Límite de fragmentos que llegan al modelo |
+| `VERSION_TEXTO` | `2` | Versión del pipeline de extracción/división |
 
 Si cambias `MODELO_EMBEDDINGS`, `TAM_CHUNK`, `SOLAPE` o `VERSION_TEXTO`, el programa crea una colección nueva y vuelve a indexar todo automáticamente. Para empezar de cero, borra la carpeta `chroma_db/`.
 
-## Documentos de prueba
+## 📚 Documentos de prueba
 
 | Archivo | Contenido | Páginas |
 | --- | --- | --- |
@@ -118,9 +167,9 @@ Si cambias `MODELO_EMBEDDINGS`, `TAM_CHUNK`, `SOLAPE` o `VERSION_TEXTO`, el prog
 | `InteraccionesFarmacoloigicas_pr.pdf` | Introducción a las interacciones farmacológicas (SEFH) | 367 |
 | `FT_Sertralina.pdf`, `FT_Litio.pdf`, `FT_Quetiapina.pdf`, `FT_Clozapina.pdf` | Fichas técnicas de la AEMPS ([CIMA](https://cima.aemps.es)) | 15–28 c/u |
 
-Los PDFs no se suben al repositorio por su tamaño y por derechos de autor.
+Los PDFs no se suben al repositorio por su tamaño y derechos de autor.
 
-## Problemas encontrados y cómo se resolvieron
+## 🛠️ Problemas encontrados y soluciones
 
 ### Problemas de instalación
 
@@ -133,29 +182,31 @@ Los PDFs no se suben al repositorio por su tamaño y por derechos de autor.
 | `NameError: name 'paso' is not defined` | Se borró una línea al editar | Usar el archivo completo en lugar de pegar trozos |
 | `model 'qwen3:4b' not found` | El modelo no estaba descargado | `ollama pull <modelo>`; verificar con `ollama list` |
 | Aviso "unauthenticated requests to the HF Hub" | Se consultaba Hugging Face en cada arranque | `HF_HUB_OFFLINE=1` con el modelo ya descargado |
+| El entorno dejó de funcionar al renombrar la carpeta a `NeuroClerk` | Windows guarda la ruta completa de la carpeta en `.venv` | Borrar `.venv`, recrearlo e instalar desde el lock |
+| `ModuleNotFoundError: No module named 'pdfplumber'` | El lock se generó antes de instalar `pdfplumber` | `pip install -r requirements.txt` y regenerar el lock |
 
 ### Calidad de la búsqueda
 
 | Problema | Causa | Solución |
 | --- | --- | --- |
-| El DSM-5 acaparaba todos los resultados | Es casi tres veces más grande que el resto | Traer candidatos de cada archivo por separado |
-| Se ignoraba el final de cada fragmento | `MiniLM-L12` lee solo ~128 tokens (~80 palabras) | Cambiar a `multilingual-e5-base` (~300 palabras), con los prefijos `passage:` y `query:` |
-| Fragmentos sin relación con la pregunta | Siempre se traía la misma cantidad de cada archivo | Filtro por margen de similitud respecto al mejor |
-| Nombrar la fuente en la pregunta empeoraba la búsqueda | "según el DSM-5" atraía páginas que repiten "DSM-5" | Preguntar sin nombrar las fuentes |
-| Palabras cortadas ("tem- poral") | OCR del DSM-5 | Expresión regular que une las palabras al cargar |
-| Las tablas nunca se encontraban | pypdf las aplana en una lista de nombres sin título, partida en varios fragmentos | Extraerlas con `pdfplumber` como fragmentos propios con el título delante |
+| El DSM-5 acaparaba todos los resultados | Era mucho más grande que el resto | Traer candidatos de cada archivo por separado |
+| Se ignoraba el final de cada fragmento | `MiniLM-L12` lee solo ~128 tokens | Cambiar a `multilingual-e5-base` |
+| Fragmentos sin relación con la pregunta | Se traía la misma cantidad de cada archivo | Filtro por margen de similitud respecto al mejor |
+| Nombrar la fuente empeoraba la búsqueda | La pregunta repetía palabras muy comunes del texto fuente | Preguntar sin nombrar las fuentes |
+| Palabras cortadas (`tem-poral`) | OCR del DSM-5 | Expresión regular para unir palabras al cargar |
+| Las tablas nunca se encontraban | `pypdf` las aplana sin título claro | Extraerlas con `pdfplumber` como fragmentos propios |
 
 ### Calidad de la respuesta
 
 | Problema | Causa | Solución |
 | --- | --- | --- |
 | `llama3.2` fallaba la mayoría de las preguntas | Modelo de 3B, débil en español | Cambiar a `qwen3:8b` |
-| Respuestas lentas con texto en inglés antes de `</think>` | `qwen3:4b` es la variante que siempre razona | Usar `qwen3:8b` con `think=False` y recortar lo anterior a `</think>` |
-| Datos inventados o mezclados (por ejemplo, "hiperkinesia") | Prompt poco estricto y temperatura por defecto | Reglas explícitas, cita después de cada afirmación y `temperature=0.1` |
-| Usaba una sola fuente aunque recibía varias | El modelo copiaba el fragmento más fácil | Regla "si varios fragmentos aportan datos distintos, inclúyelos todos" |
-| Recalcular los embeddings en cada ejecución | Los vectores vivían solo en memoria | ChromaDB guardado en disco |
+| Respuestas lentas con texto en inglés antes de `</think>` | `qwen3:4b` razona por defecto | Usar `qwen3:8b` con `think=False` |
+| Datos inventados o mezclados | Prompt poco estricto y temperatura por defecto | Reglas explícitas y `temperature=0.1` |
+| Usaba una sola fuente aunque recibía varias | Copiaba el fragmento más fácil | Regla para incluir varias fuentes si aportan datos distintos |
+| Recalcular embeddings en cada ejecución | Los vectores vivían solo en memoria | Guardar la base en ChromaDB |
 
-## Resultados de las pruebas
+## 📊 Resultados de las pruebas
 
 Pregunta de referencia: *"¿Qué es el síndrome neuroléptico maligno, cuáles son sus síntomas y qué fármacos pueden causarlo?"*
 
@@ -168,15 +219,15 @@ Pregunta de referencia: *"¿Qué es el síndrome neuroléptico maligno, cuáles 
 | + regla "inclúyelos todos" | Igual | Combina 3 fuentes; 1 cita con la página equivocada |
 | + tablas con pdfplumber | La Tabla 1 aparece primera (0.909) | Pendiente de probar |
 
-## Limitaciones conocidas
+## ⚠️ Limitaciones conocidas
 
 - **Modelo chico:** un modelo de 8B a veces mezcla conceptos parecidos o cita la página equivocada. Siempre hay que revisar las fuentes.
 - **PDFs escaneados sin texto:** si `extract_text()` devuelve vacío, hace falta OCR, que todavía no está implementado.
 - **Números de página:** son los del PDF, no los impresos en el libro.
-- **Preguntas comparativas** ("¿cuáles de estos cuatro fármacos...?") son difíciles para un RAG simple, porque la búsqueda trae fragmentos parecidos a la pregunta y no necesariamente el dato de cada documento.
-- **No es una herramienta clínica:** es un proyecto de aprendizaje. Sus respuestas no reemplazan la consulta de las fuentes originales ni el criterio profesional.
+- **Preguntas comparativas:** son difíciles para un RAG simple.
+- **No es una herramienta clínica:** sus respuestas no reemplazan el criterio profesional ni la consulta de las fuentes originales.
 
-## Próximos pasos
+## 🚀 Próximos pasos
 
 - [ ] Probar la versión con tablas en todas las preguntas de referencia.
 - [ ] OCR para imágenes y PDFs escaneados (`pytesseract`).

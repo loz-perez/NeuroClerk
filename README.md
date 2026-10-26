@@ -2,7 +2,7 @@
 
 ## Propuesta de proyecto psiquiátrico (MVP)
 
-NeuroClerk es un asistente local para documentación clínica y consultas farmacológicas basado en RAG. Su objetivo es ayudar a estructurar notas de evolución y responder preguntas sobre interacciones medicamentosas usando únicamente documentos locales, sin depender de servicios externos ni alucinaciones del modelo.
+NeuroClerk es un asistente para psiquiatría que responde consultas sobre interacciones farmacológicas y, en una próxima versión, ayudará a estructurar notas de evolución. Usa RAG: responde solo con la información de documentos de referencia, como el DSM-5 o fichas técnicas, y cita el archivo y la página de cada dato, para que cualquier respuesta se pueda verificar en la fuente. Funciona por completo en equipos propios, sin enviar información a servicios de terceros.
 
 ## ✨ Descripción general
 

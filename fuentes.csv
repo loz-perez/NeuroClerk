@@ -48,3 +48,13 @@ FT_Ibuprofeno.pdf,Ficha técnica de ibuprofeno (DOLORAC 600 mg POLVO PARA SUSPEN
 FT_Claritromicina.pdf,Ficha técnica de claritromicina (CLARITROMICINA SANDOZ 25 mg/ml GRANULADO PARA SUSPENSION ORAL),ficha,AEMPS (CIMA),https://cima.aemps.es/cima/pdfs/ft/66388/FT_66388.pdf,nregistro 66388; revisión 2024-11-25,2026-10-26,público,
 FT_Linezolid.pdf,Ficha técnica de linezolid (ZYVOXID 100 mg/5 ml GRANULADO PARA SUSPENSION ORAL),ficha,AEMPS (CIMA),https://cima.aemps.es/cima/pdfs/ft/64107/FT_64107.pdf,nregistro 64107; revisión 2026-05-20,2026-10-26,público,
 FT_Ciprofloxacino.pdf,Ficha técnica de ciprofloxacino (CETRAXAL 100mg/ml SUSPENSION ORAL),ficha,AEMPS (CIMA),https://cima.aemps.es/cima/pdfs/ft/62602/FT_62602.pdf,nregistro 62602; revisión 2025-05-22,2026-10-26,público,
+DSM-5-TR.pdf,Manual diagnóstico y estadístico de los trastornos mentales,diagnostico,American Psychiatric Association,,COMPROBAR SI ES DSM-5 O DSM-5-TR,,restringido (derechos de autor),PDF escaneado con OCR
+Interacciones_Farmacologicas_SEFH.pdf,Introducción a las interacciones farmacológicas,interacciones,Sociedad Española de Farmacia Hospitalaria (SEFH),,1.ª edición,,restringido,PDF cifrado: necesita la librería cryptography
+CIE-11.pdf,CIE-11: guía de referencia,diagnostico,Organización Mundial de la Salud,,2025-01,,público,
+Guía_mhGAP-spa.pdf,Guía de intervención mhGAP,guia,OMS / OPS,,,,público,
+Tabla_de_enzimas_CYP450_Flockhart_Table.pdf,Tabla de interacciones del citocromo P450 (Flockhart),interacciones,Indiana University School of Medicine,,,,revisar condiciones de uso,Tabla: la extrae pdfplumber
+PHQ-9_Spanish.pdf,Cuestionario PHQ-9,escala,Pfizer,,,,público (uso libre),
+GAD-7-spanish.pdf,Escala GAD-7,escala,Pfizer,,,,público (uso libre),
+PANSS.pdf,Escala PANSS,escala,Kay, Fiszbein y Opler,,,,restringido (con licencia),No compartir
+YMRS.pdf,Escala de manía de Young (YMRS),escala,Young et al.,,,,revisar licencia,
+Formulario_Terapeutico_de_Medicamentos.pdf,Formulario Terapéutico de Medicamentos (FTM),formulario,Ministerio de Salud Pública (Uruguay),,2012,,público,Medicamentos disponibles en Uruguay; revisar si hay una edición más nueva

@@ -3,6 +3,9 @@
 # en ChromaDB (carpeta "chroma_db"). La próxima vez solo procesa los PDFs nuevos.
 # Luego busca los fragmentos más parecidos a tu pregunta y se los pasa al modelo (Ollama).
 
+import os
+os.environ["HF_HUB_OFFLINE"] = "1"   # usa el modelo ya descargado (quítalo si cambias de modelo)
+
 import re
 import hashlib
 from pathlib import Path
@@ -10,6 +13,7 @@ from pathlib import Path
 import numpy as np
 import chromadb
 import ollama
+import pdfplumber
 from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
 
@@ -24,7 +28,7 @@ SOLAPE = 40                    # palabras repetidas entre fragmentos
 K_POR_ARCHIVO = 3              # candidatos que se buscan en cada PDF
 MARGEN = 0.03                  # se descarta lo que esté a más de esto del mejor fragmento
 MAX_FRAGMENTOS = 8             # tope de fragmentos que llegan al modelo
-VERSION_TEXTO = 2              # súbela cada vez que cambies cargar_pdf o dividir_en_chunks
+VERSION_TEXTO = 3              # súbela cada vez que cambies cómo se extrae o divide el texto
 
 CARPETA_DATOS = "datos"
 CARPETA_DB = "chroma_db"       # aquí ChromaDB guarda los vectores en disco
@@ -47,6 +51,68 @@ def cargar_pdf(ruta):
         if texto:
             paginas.append({"pagina": numero, "texto": texto})
     return paginas
+
+
+# ---------------------------------------------------------------
+# 1b) TABLAS: extraerlas con pdfplumber y convertirlas en texto legible
+# ---------------------------------------------------------------
+def limpiar(celda):
+    return " ".join((celda or "").split())
+
+
+def tabla_a_texto(filas):
+    """Convierte una tabla (lista de filas) en (título, líneas de texto)."""
+    # Cada celda puede tener varios renglones (p. ej. una columna de fármacos)
+    filas = [[(c or "").strip() for c in f] for f in filas]
+    filas = [f for f in filas if any(f)]
+    if not filas:
+        return "", []
+
+    # Si la primera fila tiene una sola celda con texto, es el título de la tabla
+    titulo = ""
+    if sum(1 for c in filas[0] if c) == 1:
+        titulo = limpiar(next(c for c in filas[0] if c))
+        filas = filas[1:]
+
+    lineas = []
+    encabezado = filas[0] if len(filas) >= 3 and sum(1 for c in filas[0] if c) >= 2 else None
+    if encabezado:
+        # Tabla con encabezado: cada fila se escribe como "columna: valor; columna: valor"
+        nombres = [limpiar(c) for c in encabezado]
+        for f in filas[1:]:
+            partes = [f"{n}: {limpiar(v)}" if n else limpiar(v)
+                      for n, v in zip(nombres, f) if limpiar(v)]
+            if partes:
+                lineas.append("; ".join(partes))
+    else:
+        # Tabla tipo lista: todos los elementos separados por comas
+        elementos = [limpiar(x) for f in filas for c in f for x in c.split("\n") if limpiar(x)]
+        if elementos:
+            lineas.append(", ".join(elementos))
+    return titulo, lineas
+
+
+def cargar_tablas(ruta, tam=TAM_CHUNK):
+    """Devuelve fragmentos de tablas; cada uno lleva el título delante."""
+    fragmentos = []
+    with pdfplumber.open(ruta) as pdf:
+        for numero, pagina in enumerate(pdf.pages, start=1):
+            try:
+                tablas = pagina.extract_tables()
+            except Exception:
+                continue   # alguna página rara no debe frenar todo
+            for filas in tablas:
+                titulo, lineas = tabla_a_texto(filas)
+                texto = " ".join(lineas)
+                if len(texto.split()) < 5:
+                    continue   # tablas vacías o casi vacías
+                prefijo = f"{titulo}: " if titulo else "Tabla: "
+                palabras = texto.split()
+                # Tablas largas: se parten, pero cada trozo repite el título
+                for i in range(0, len(palabras), tam):
+                    trozo = " ".join(palabras[i:i + tam])
+                    fragmentos.append({"pagina": numero, "texto": prefijo + trozo})
+    return fragmentos
 
 
 # ---------------------------------------------------------------
@@ -88,6 +154,10 @@ def huella(ruta):
 
 def indexar_pdf(ruta):
     chunks = dividir_en_chunks(cargar_pdf(ruta))
+    tablas = cargar_tablas(ruta)
+    if tablas:
+        print(f"  {len(tablas)} fragmentos de tablas encontrados")
+    chunks += tablas
     if not chunks:
         print(f"  (sin texto: {ruta.name} puede ser un PDF escaneado)")
         return

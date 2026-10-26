@@ -1,10 +1,14 @@
-# rag.py — RAG básico con PDFs
-# Lee todos los PDFs de la carpeta "datos", los parte en fragmentos,
-# busca los más parecidos a tu pregunta y se los pasa al modelo (Ollama).
+# rag.py — RAG básico con PDFs y ChromaDB
+# Lee los PDFs de la carpeta "datos", los parte en fragmentos y guarda sus vectores
+# en ChromaDB (carpeta "chroma_db"). La próxima vez solo procesa los PDFs nuevos.
+# Luego busca los fragmentos más parecidos a tu pregunta y se los pasa al modelo (Ollama).
 
+import re
+import hashlib
 from pathlib import Path
 
 import numpy as np
+import chromadb
 import ollama
 from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
@@ -17,7 +21,13 @@ MODELO_LLM = "qwen3:8b"        # o "gemma3:4b", "gemma3:12b", "llama3.2"...
 MODELO_EMBEDDINGS = "intfloat/multilingual-e5-base"   # lee hasta ~300 palabras
 TAM_CHUNK = 200                # palabras por fragmento
 SOLAPE = 40                    # palabras repetidas entre fragmentos
-K_POR_ARCHIVO = 2              # fragmentos que se traen de cada PDF
+K_POR_ARCHIVO = 3              # candidatos que se buscan en cada PDF
+MARGEN = 0.03                  # se descarta lo que esté a más de esto del mejor fragmento
+MAX_FRAGMENTOS = 8             # tope de fragmentos que llegan al modelo
+VERSION_TEXTO = 2              # súbela cada vez que cambies cargar_pdf o dividir_en_chunks
+
+CARPETA_DATOS = "datos"
+CARPETA_DB = "chroma_db"       # aquí ChromaDB guarda los vectores en disco
 
 # e5 necesita estos prefijos para distinguir documentos de preguntas
 PREFIJO_DOC = "passage: "
@@ -31,8 +41,9 @@ def cargar_pdf(ruta):
     lector = PdfReader(ruta)
     paginas = []
     for numero, pagina in enumerate(lector.pages, start=1):
-        texto = pagina.extract_text() or ""   # algunas páginas devuelven None
-        texto = " ".join(texto.split())        # limpia saltos y espacios extra
+        texto = pagina.extract_text() or ""            # algunas páginas devuelven None
+        texto = " ".join(texto.split())                 # limpia saltos y espacios extra
+        texto = re.sub(r"(\w)- (\w)", r"\1\2", texto)   # "dificul- tad" -> "dificultad"
         if texto:
             paginas.append({"pagina": numero, "texto": texto})
     return paginas
@@ -55,39 +66,108 @@ def dividir_en_chunks(paginas, tam=TAM_CHUNK, solape=SOLAPE):
 
 
 # ---------------------------------------------------------------
-# 3) PREPARAR: cargar todos los PDFs y calcular sus vectores
+# 3) PREPARAR: abrir ChromaDB y procesar solo los PDFs que falten
 # ---------------------------------------------------------------
-chunks = []
-for ruta in Path("datos").glob("*.pdf"):
-    print(f"Leyendo {ruta.name}...")
-    for c in dividir_en_chunks(cargar_pdf(ruta)):
-        c["archivo"] = ruta.name
-        chunks.append(c)
-
-if not chunks:
-    raise SystemExit("No encontré texto. ¿Hay algún PDF dentro de la carpeta 'datos'?")
-
-print(f"Se cargaron {len(chunks)} fragmentos. Calculando embeddings (puede tardar)...")
-
 modelo_emb = SentenceTransformer(MODELO_EMBEDDINGS)
-textos = [c["texto"] for c in chunks]
-vectores = modelo_emb.encode(
-    [PREFIJO_DOC + t for t in textos], normalize_embeddings=True, show_progress_bar=True
-)
+
+# Si cambias el modelo de embeddings o el tamaño de los chunks, los vectores viejos
+# ya no sirven. Por eso el nombre de la colección depende de esa configuración:
+# al cambiarla se crea una colección nueva y se recalcula todo automáticamente.
+config = f"{MODELO_EMBEDDINGS}|{TAM_CHUNK}|{SOLAPE}|{VERSION_TEXTO}"
+nombre_coleccion = "rag_" + hashlib.md5(config.encode()).hexdigest()[:10]
+
+cliente = chromadb.PersistentClient(path=CARPETA_DB)
+coleccion = cliente.get_or_create_collection(nombre_coleccion)
+
+
+def huella(ruta):
+    """Tamaño + fecha de modificación: si cambia, el PDF fue reemplazado."""
+    info = ruta.stat()
+    return f"{info.st_size}-{int(info.st_mtime)}"
+
+
+def indexar_pdf(ruta):
+    chunks = dividir_en_chunks(cargar_pdf(ruta))
+    if not chunks:
+        print(f"  (sin texto: {ruta.name} puede ser un PDF escaneado)")
+        return
+    textos = [c["texto"] for c in chunks]
+    vectores = modelo_emb.encode(
+        [PREFIJO_DOC + t for t in textos], normalize_embeddings=True, show_progress_bar=True
+    )
+    marca = huella(ruta)
+    # ChromaDB acepta lotes de tamaño limitado, así que se guardan de a 1000
+    for i in range(0, len(chunks), 1000):
+        lote = range(i, min(i + 1000, len(chunks)))
+        coleccion.add(
+            ids=[f"{ruta.name}-{j}" for j in lote],
+            embeddings=[vectores[j].tolist() for j in lote],
+            documents=[textos[j] for j in lote],
+            metadatas=[{"archivo": ruta.name, "pagina": chunks[j]["pagina"], "huella": marca}
+                       for j in lote],
+        )
+    print(f"  {len(chunks)} fragmentos guardados")
+
+
+pdfs = sorted(Path(CARPETA_DATOS).glob("*.pdf"))
+if not pdfs:
+    raise SystemExit(f"No encontré PDFs dentro de la carpeta '{CARPETA_DATOS}'.")
+
+for ruta in pdfs:
+    guardado = coleccion.get(where={"archivo": ruta.name}, limit=1, include=["metadatas"])
+    if guardado["ids"] and guardado["metadatas"][0].get("huella") == huella(ruta):
+        print(f"Ya indexado: {ruta.name}")
+        continue
+    if guardado["ids"]:
+        print(f"{ruta.name} cambió: borrando sus vectores viejos...")
+        coleccion.delete(where={"archivo": ruta.name})
+    print(f"Indexando {ruta.name} (solo esta vez)...")
+    indexar_pdf(ruta)
+
+# Los PDFs que quitaste de la carpeta "datos" también se quitan de la base
+nombres_actuales = {r.name for r in pdfs}
+todos = coleccion.get(include=["metadatas"])
+for archivo in {m["archivo"] for m in todos["metadatas"]} - nombres_actuales:
+    print(f"Quitando {archivo} (ya no está en '{CARPETA_DATOS}')")
+    coleccion.delete(where={"archivo": archivo})
+
+archivos = sorted(nombres_actuales)
+print(f"Base lista: {coleccion.count()} fragmentos de {len(archivos)} archivos.")
 
 
 # ---------------------------------------------------------------
-# 4) RECUPERAR: los fragmentos más parecidos, de CADA archivo
+# 4) RECUPERAR: los fragmentos más parecidos, de CADA archivo,
+#    descartando los que se parecen mucho menos que el mejor
 # ---------------------------------------------------------------
-def recuperar(pregunta, k_por_archivo=K_POR_ARCHIVO):
+def recuperar(pregunta, k_por_archivo=K_POR_ARCHIVO, margen=MARGEN, max_total=MAX_FRAGMENTOS):
     v = modelo_emb.encode([PREFIJO_PREGUNTA + pregunta], normalize_embeddings=True)[0]
-    similitudes = vectores @ v
-    resultado = []
-    for archivo in sorted({c["archivo"] for c in chunks}):
-        indices = [i for i, c in enumerate(chunks) if c["archivo"] == archivo]
-        mejores = sorted(indices, key=lambda i: similitudes[i], reverse=True)[:k_por_archivo]
-        resultado += [chunks[i] for i in mejores]
-    return resultado
+
+    # Paso 1: candidatos, los k mejores de cada archivo (ChromaDB hace la búsqueda)
+    candidatos = []
+    for archivo in archivos:
+        r = coleccion.query(
+            query_embeddings=[v.tolist()],
+            n_results=k_por_archivo,
+            where={"archivo": archivo},
+            include=["documents", "metadatas", "embeddings"],
+        )
+        for texto, meta, emb in zip(r["documents"][0], r["metadatas"][0], r["embeddings"][0]):
+            candidatos.append({
+                "archivo": meta["archivo"],
+                "pagina": meta["pagina"],
+                "texto": texto,
+                "similitud": float(np.dot(emb, v)),   # similitud coseno (vectores normalizados)
+            })
+    if not candidatos:
+        return []
+
+    # Paso 2: filtro, solo los que están cerca del mejor candidato
+    mejor = max(c["similitud"] for c in candidatos)
+    aceptados = [c for c in candidatos if c["similitud"] >= mejor - margen]
+
+    # Paso 3: ordenar de más a menos parecido y aplicar el tope
+    aceptados.sort(key=lambda c: c["similitud"], reverse=True)
+    return aceptados[:max_total]
 
 
 # ---------------------------------------------------------------
@@ -98,7 +178,7 @@ def responder(pregunta):
 
     print("\nFragmentos usados:")
     for c in encontrados:
-        print(f"  -> {c['archivo']}, página {c['pagina']}: {c['texto'][:80]}...")
+        print(f"  -> [{c['similitud']:.3f}] {c['archivo']}, página {c['pagina']}: {c['texto'][:70]}...")
 
     contexto = "\n\n".join(
         f"[{c['archivo']}, página {c['pagina']}] {c['texto']}" for c in encontrados
@@ -109,6 +189,7 @@ def responder(pregunta):
         "- No agregues nada que no esté escrito en los fragmentos.\n"
         "- Después de cada afirmación, indica entre corchetes el archivo y la página.\n"
         "- Ignora los fragmentos que no tengan relación con la pregunta.\n"
+        "- Si varios fragmentos aportan datos distintos sobre el tema, inclúyelos todos.\n"
         "- Si el contexto no alcanza para responder, dilo.\n\n"
         f"Contexto:\n{contexto}\n\nPregunta: {pregunta}\n\nRespuesta en español:"
     )
@@ -120,7 +201,7 @@ def responder(pregunta):
     r = ollama.chat(
         model=MODELO_LLM,
         messages=[{"role": "user", "content": prompt}],
-        options={"num_ctx": 8192, "temperature": 0.1}, 
+        options={"num_ctx": 8192, "temperature": 0.1},   # contexto amplio y poca "creatividad"
         **opciones_extra,
     )
     texto = r["message"]["content"]

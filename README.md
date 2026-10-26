@@ -33,7 +33,7 @@ flowchart LR
 
 ## Estructura del proyecto
 
-```
+```text
 NeuroClerk/
 ├── .venv/                 # entorno virtual (no se sube a Git)
 ├── datos/                 # tus PDFs (no se suben a Git)
@@ -89,7 +89,7 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
   pip freeze > requirements-lock.txt
   ```
 - `pip freeze` no escribe la dirección de PyTorch CPU. Después de regenerarlo, agrega esta línea **al principio** del archivo; si no, falla la instalación de `torch==...+cpu`:
-  ```
+  ```text
   --extra-index-url https://download.pytorch.org/whl/cpu
   ```
 
@@ -110,7 +110,7 @@ La primera ejecución tarda varios minutos porque indexa todo. Las siguientes ar
 
 Para cada pregunta, el programa muestra los fragmentos usados con su puntaje de similitud. Mientras el modelo escribe aparecen puntos, y al final la respuesta:
 
-```
+```text
 Fragmentos usados:
   -> [0.909] InteraccionesFarmacoloigicas_pr.pdf, página 9: Tabla 1. Fármacos que pueden causar...
   -> [0.894] InteraccionesFarmacoloigicas_pr.pdf, página 9: de receptores), en los procesos...

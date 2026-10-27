@@ -30,11 +30,12 @@ from sentence_transformers import SentenceTransformer
 # no mandes datos de pacientes por ahí.
 PROVEEDOR = "gemini"
 MODELOS = {
-    "gemini": "gemini-3.5-flash-lite",
+    "gemini": "gemini-3.8-flash",
     "groq": "openai/gpt-oss-120b",
     "ollama": "qwen3:8b",
 }
-MODELO_LLM = MODELOS[PROVEEDOR]
+# La variable de entorno NEUROCLERK_MODELO permite usar otro modelo sin editar este archivo
+MODELO_LLM = os.environ.get("NEUROCLERK_MODELO") or MODELOS[PROVEEDOR]
 _VARIABLES = {"gemini": "GEMINI_API_KEY", "groq": "GROQ_API_KEY"}
 if not SOLO_INDEXAR and PROVEEDOR in _VARIABLES and not os.environ.get(_VARIABLES[PROVEEDOR]):
     raise SystemExit(f"Falta la clave de {PROVEEDOR}: define la variable de entorno "
@@ -47,7 +48,10 @@ SOLAPE = 40                    # palabras repetidas entre fragmentos
 K_MIN, K_MAX = 3, 15           # candidatos por PDF: 3 en una ficha corta, hasta 15 en un libro
 FRAGMENTOS_POR_CANDIDATO = 100 # un candidato más por cada 100 fragmentos del documento
 MARGEN = 0.03                  # se descarta lo que esté a más de esto del mejor fragmento
-MAX_FRAGMENTOS = 10            # tope de fragmentos que llegan al modelo
+MAX_FRAGMENTOS = 12            # tope de fragmentos que llegan al modelo
+MAX_POR_PAGINA = 2             # tope de fragmentos de una misma página (evita que una tabla copa todo)
+SIMILITUD_DUPLICADO = 0.5      # dos fragmentos de una página que comparten más de esto de sus palabras
+                               # son casi el mismo texto (p. ej. un cuadro leído como texto y como tabla)
 VERSION_TEXTO = 3              # súbela cada vez que cambies cómo se extrae o divide el texto
 
 CARPETA_DATOS = "datos"
@@ -306,9 +310,36 @@ def recuperar(pregunta, k_por_archivo=None, margen=MARGEN, max_total=MAX_FRAGMEN
     mejor = max(c["similitud"] for c in candidatos)
     aceptados = [c for c in candidatos if c["similitud"] >= mejor - margen]
 
-    # Paso 3: ordenar de más a menos parecido y aplicar el tope
+    # Paso 3: ordenar de más a menos parecido, limitar cuántos vienen de una misma página
+    # (una tabla con muchas filas no debe ocupar todo el contexto) y aplicar el tope
     aceptados.sort(key=lambda c: c["similitud"], reverse=True)
-    return aceptados[:max_total]
+    por_pagina, elegidos = {}, []
+    for c in aceptados:
+        clave = (c["archivo"], c["pagina"])
+        if por_pagina.get(clave, 0) >= MAX_POR_PAGINA:
+            continue
+        # Casi duplicado de otro fragmento ya elegido de la misma página: no aporta nada nuevo
+        if any((e["archivo"], e["pagina"]) == clave and
+               _parecido(c["texto"], e["texto"]) > SIMILITUD_DUPLICADO for e in elegidos):
+            continue
+        por_pagina[clave] = por_pagina.get(clave, 0) + 1
+        elegidos.append(c)
+    return elegidos[:max_total]
+
+
+def _palabras(texto):
+    """Conjunto de palabras de más de 3 letras, en minúsculas y sin signos."""
+    return {p for p in re.findall(r"\w+", texto.lower()) if len(p) > 3}
+
+
+def _parecido(texto_a, texto_b):
+    """Proporción de palabras compartidas (índice de Jaccard): 0 = nada en común, 1 = iguales.
+
+    Antes se quita el comienzo que tienen en común: dos filas de una misma tabla repiten el
+    título, y sin esto parecerían duplicadas aunque hablen de fármacos distintos."""
+    comun = len(os.path.commonprefix([texto_a, texto_b]))
+    a, b = _palabras(texto_a[comun:]), _palabras(texto_b[comun:])
+    return len(a & b) / len(a | b) if a and b else 0.0
 
 
 # ---------------------------------------------------------------
@@ -400,8 +431,14 @@ def generar(prompt):
                     yield trozo.choices[0].delta.content
             return
         except RateLimitError:
-            yield ("[Se alcanzó el límite gratuito del proveedor. Espera un minuto y vuelve a "
-                   "preguntar, o cambia PROVEEDOR en el bloque 0.]")
+            # Límite por minuto: suele bastar con esperar. Si se repite, es el cupo diario.
+            if intento < 2:
+                espera = 30 * (intento + 1)   # 30 y 60 segundos
+                print(f"\n  (límite de peticiones por minuto; reintento en {espera} s)", flush=True)
+                time.sleep(espera)
+                continue
+            yield ("[Se alcanzó el límite gratuito del proveedor (probablemente el cupo diario). "
+                   "Prueba más tarde, o cambia de modelo o de PROVEEDOR en el bloque 0.]")
             return
         except (InternalServerError, APIConnectionError, APITimeoutError) as e:
             if intento == 3:

@@ -18,7 +18,7 @@ flowchart LR
     E --> F[(ChromaDB<br/>chroma_db/)]
     P[Pregunta] --> G[Buscar candidatos<br/>3 a 15 por archivo]
     F --> G
-    G --> H[Filtrar por similitud<br/>margen 0.03, máx. 10]
+    G --> H[Filtrar por similitud<br/>margen 0.03, máx. 12]
     H --> I[Prompt con reglas<br/>y citas]
     I --> J[Modelo de lenguaje<br/>Gemini, Groq u Ollama]
     J --> R[Respuesta citada]
@@ -39,7 +39,8 @@ NeuroClerk/
 ├── datos/                 # tus PDFs (no se suben a Git)
 ├── chroma_db/             # vectores guardados (no se sube a Git)
 ├── rag.py                 # el programa completo
-├── probar_tablas.py       # pruebas automáticas de búsqueda y respuesta
+├── probar_rag.py          # pruebas automáticas de búsqueda y respuesta
+├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
 ├── descargar_fichas.py    # descarga las fichas técnicas de CIMA
 ├── revisar_datos.py       # revisa la carpeta datos/ antes de indexar
 ├── fuentes.csv            # registro de los documentos de datos/
@@ -211,7 +212,9 @@ Todo se ajusta en el bloque 0 de `rag.py`:
 | `K_MIN`, `K_MAX` | `3`, `15` | Candidatos que se buscan en cada PDF: 3 en una ficha corta, hasta 15 en un libro |
 | `FRAGMENTOS_POR_CANDIDATO` | `100` | Un candidato más por cada 100 fragmentos del documento |
 | `MARGEN` | `0.03` | Se descartan los fragmentos que quedan más de esto por debajo del mejor |
-| `MAX_FRAGMENTOS` | `10` | Tope de fragmentos que llegan al modelo |
+| `MAX_FRAGMENTOS` | `12` | Tope de fragmentos que llegan al modelo |
+| `MAX_POR_PAGINA` | `2` | Tope de fragmentos de una misma página, para que una tabla con muchas filas no ocupe todo el contexto |
+| `SIMILITUD_DUPLICADO` | `0.5` | Dos fragmentos de una misma página que comparten más de esta proporción de palabras se consideran el mismo texto, y se usa solo uno (pasa cuando un cuadro se lee como texto y también como tabla) |
 | `VERSION_TEXTO` | `3` | Súbela cada vez que cambies cómo se extrae o se divide el texto |
 
 El modelo trabaja con `temperature` 0.1, para que se apegue al texto. El tope de la respuesta es de 700 tokens con Ollama y de 2.000 con los proveedores en la nube, que cuentan su razonamiento dentro de ese tope.
@@ -222,43 +225,42 @@ Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la
 
 ## Pruebas
 
-`probar_tablas.py` comprueba con 7 preguntas que la búsqueda encuentra las fuentes correctas y que el modelo las usa:
+`probar_rag.py` comprueba con 19 preguntas, de todos los tipos de documento, que la búsqueda encuentra las fuentes correctas y que el modelo las usa. Los casos también están en `casos_de_prueba_NeuroClerk.xlsx`, donde se anotan los resultados de cada ejecución.
 
 ```powershell
-python .\probar_tablas.py          # solo la búsqueda: rápido, no usa el modelo
-python .\probar_tablas.py --llm    # además pide la respuesta al modelo (gasta 7 peticiones)
+python .\probar_rag.py --verificar             # revisa que los casos estén bien armados
+python .\probar_rag.py                         # solo la búsqueda: rápido, no usa el modelo
+python .\probar_rag.py --llm                   # además pide la respuesta al modelo (19 peticiones)
+python .\probar_rag.py --buscar litemia FT_Litio.pdf   # busca una palabra en los documentos
+python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO     # por qué un fragmento llega o no al modelo
 ```
 
-Para cada pregunta mide tres cosas:
+Opciones de `--llm`:
 
-- **Tabla:** si aparece la tabla del libro de interacciones que contiene la respuesta.
-- **Fuente:** si aparece alguna fuente válida, sea la tabla o la ficha técnica del fármaco.
+- `--modelo NOMBRE`: modelo para la prueba. Por defecto usa `gemini-3.5-flash-lite`, porque el plan gratuito de `gemini-3.8-flash` no alcanza para las 19 preguntas. El programa normal (`rag.py`) sigue usando el modelo del bloque 0.
+- `--pausa SEGUNDOS`: espera entre preguntas (por defecto 12), para no chocar con el límite de peticiones por minuto.
+
+Si el proveedor falla dos veces seguidas, la prueba deja de pedir respuestas y sigue solo con la búsqueda.
+
+Para cada pregunta mide:
+
+- **Tabla:** si aparece la tabla del libro de interacciones que contiene la respuesta (casos 1 a 7).
+- **Fuente:** si aparece alguna fuente válida: la tabla, la ficha técnica, el DSM, la CIE-11, la guía o la escala que corresponda.
 - **Respuesta:** si la respuesta nombra las palabras clave. En los casos 1, 2, 3 y 7 son fármacos que figuran **solo en la tabla** y en ninguna de las 51 fichas, así que nombrarlos prueba que el modelo usó la tabla.
+- **Abstención:** en dos preguntas cuya respuesta no está en los documentos (la dosis de esketamina y la capital de Uruguay), si el sistema se niega a responder en lugar de inventar.
 
 Los avisos del proveedor (límite alcanzado, servidor caído) se cuentan como errores y no como fallos.
 
-Resultado actual, con los 59 documentos y Gemini:
+Línea de base del 27/10/2026, con los 59 documentos:
 
-| # | Pregunta | Tabla | Puesto | Respuesta |
-| --- | --- | --- | --- | --- |
-| 1 | Fármacos que causan síndrome neuroléptico maligno | Tabla 1, pág. 9 | 1.º (0.909) | ✅ pergolida, tiopropenazina, tolcapona |
-| 2 | Fármacos que causan síndrome serotoninérgico | Tabla 2, pág. 10 | 1.º (0.906) | ✅ dapoxetina, metiltionina, tapentadol |
-| 3 | Fármacos que prolongan el QT | Tabla 3, pág. 11 | 5.º (0.881) | ✅ ebastina, retigabina, piperaquina, eribulina |
-| 4 | IECA y litio | Tabla 5, pág. 177 | 1.º (0.888) | ✅ toxicidad, concentraciones |
-| 5 | Isoenzimas que metabolizan la clozapina | Tabla 7, pág. 265 | 1.º (0.906) | ✅ CYP1A2 |
-| 6 | Metabolismo del alprazolam | Tabla 9, pág. 268 | 2.º (0.885) | ✅ CYP3A4 |
-| 7 | Inhibidores del CYP2D6 | Tabla 6, pág. 20 | 9.º (0.871) | ✅ imatinib, pazopanib, cinacalcet |
+| Medida | Resultado |
+| --- | --- |
+| Tabla | 7/7 |
+| Fuente | 16/17 |
+| Respuesta | 12/17 |
+| Abstención | 2/2 |
 
-**Tabla 7/7 · Fuente 7/7 · Respuesta 7/7.**
-
-Evolución:
-
-| Versión | Tabla | Fuente | Respuesta |
-| --- | --- | --- | --- |
-| Tablas en bloques de 200 palabras, 3 candidatos por archivo | 4/7 | 6/7 | 6/7 |
-| Tablas por filas y categorías, cupo proporcional al tamaño | **7/7** | **7/7** | **7/7** |
-
-Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas y compara. Anota el resultado en el mensaje del commit.
+El detalle de cada caso y la evolución entre versiones están en la hoja de cálculo. Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas, anota el resultado en la hoja *Historial* y en el mensaje del commit.
 
 ## Documentos de prueba
 
@@ -317,7 +319,7 @@ Los PDFs no se suben al repositorio por su tamaño y por derechos de autor.
 | Parecía colgado en algunas preguntas | Copiaba listas de más de 100 fármacos y no mostraba nada hasta terminar | Streaming con un punto por trozo y tope de tokens |
 | Respuestas lentas con el modelo local | `qwen3:8b` en CPU | Modelo en la nube (Gemini o Groq) |
 | `Error code: 503` | Servidores de Gemini saturados | Reintentos automáticos con espera de 2, 4 y 8 segundos |
-| Se agotaba el límite diario de Gemini | El plan gratuito limita las peticiones por día | Cambiar de modelo o de proveedor; usar `probar_tablas.py` sin `--llm` cuando solo se revisa la búsqueda |
+| Las pruebas se quedaban sin cupo de Gemini | `gemini-3.8-flash` no alcanza para 19 preguntas seguidas en el plan gratuito, y hay límite por minuto | Las pruebas usan `gemini-3.5-flash-lite` por defecto, con pausa entre preguntas y reintentos ante el error 429 |
 | Recalcular los embeddings en cada ejecución | Los vectores vivían solo en memoria | ChromaDB guardado en disco |
 
 ## Resultados de las pruebas
@@ -337,7 +339,6 @@ Pregunta de referencia: *"¿Qué es el síndrome neuroléptico maligno, cuáles 
 ## Limitaciones conocidas
 
 - **Hay que revisar las fuentes:** aunque los resultados son buenos, el modelo puede citar una página equivocada o mezclar conceptos parecidos.
-- **Una tabla puede ocupar muchos lugares:** con un fragmento por fila, varias filas de la misma tabla pueden llenar el contexto y dejar fuera otras fuentes.
 - **Límites del plan gratuito:** los proveedores en la nube limitan las peticiones por día o por minuto.
 - **PDFs escaneados sin texto:** si `extract_text()` devuelve vacío, hace falta OCR, que todavía no está implementado.
 - **Números de página:** son los del PDF, no los impresos en el libro.

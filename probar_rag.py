@@ -3,6 +3,19 @@
 # Uso:
 #   python probar_rag.py               -> solo la búsqueda (rápido, no usa el modelo)
 #   python probar_rag.py --llm         -> además pide la respuesta al modelo (~19 peticiones)
+#   python probar_rag.py --llm --modelo gemini-3.8-flash
+#                                      -> usa otro modelo. Por defecto las pruebas usan
+#                                         gemini-3.5-flash-lite, que tiene cupo para las 19 preguntas
+#   python probar_rag.py --llm --pausa 15
+#                                      -> espera 15 segundos entre preguntas (por defecto 12),
+#                                         para no chocar con el límite por minuto del proveedor
+#   python probar_rag.py --buscar PALABRA [ARCHIVO]
+#                                      -> muestra los fragmentos que contienen esa palabra
+#                                         (en todos los documentos, o solo en ARCHIVO);
+#                                         sirve para elegir preguntas y palabras clave
+#   python probar_rag.py --ranking "PREGUNTA" ARCHIVO
+#                                      -> muestra los 15 fragmentos de ARCHIVO más parecidos a la
+#                                         pregunta, con su similitud, y si pasarían el filtro
 #   python probar_rag.py --verificar   -> revisa que los casos estén bien armados:
 #                                         que cada palabra clave exista en su fuente,
 #                                         que no esté en la pregunta, y que lo que debe
@@ -10,9 +23,18 @@
 #
 # Usa la misma base de ChromaDB que rag.py: si los PDFs ya están indexados, arranca rápido.
 
+import os
 import re
 import sys
+import time
 import unicodedata
+
+# El modelo se elige ANTES de importar rag.py. Por defecto, uno con cupo para toda la prueba.
+MODELO_PRUEBAS = "gemini-3.5-flash-lite"
+if "--modelo" in sys.argv:
+    os.environ["NEUROCLERK_MODELO"] = sys.argv[sys.argv.index("--modelo") + 1]
+else:
+    os.environ.setdefault("NEUROCLERK_MODELO", MODELO_PRUEBAS)
 
 import rag   # al importarlo se abre ChromaDB y se indexa lo que falte
 
@@ -66,7 +88,7 @@ CASOS = [
      "fuentes": ["FT_Sertralina.pdf"], "claves": ["50 mg"]},
     {"tipo": "fuente", "grupo": "Ficha: seguridad",
      "pregunta": "¿Qué controles de sangre requiere el tratamiento con clozapina?",
-     "fuentes": ["FT_Clozapina.pdf"], "claves": ["neutrofilos", "leucocitos"]},
+     "fuentes": ["FT_Clozapina.pdf"], "claves": ["neutrofilos", "leucocitos", "ran", "recuento"]},
     {"tipo": "fuente", "grupo": "Ficha: niveles",
      "pregunta": "¿Qué concentraciones de litio en sangre se consideran terapéuticas?",
      "fuentes": ["FT_Litio.pdf"], "claves": ["meq", "mmol"]},
@@ -76,8 +98,8 @@ CASOS = [
      "pregunta": "¿Cuánto tiempo deben durar los síntomas para diagnosticar un episodio de depresión mayor?",
      "fuentes": ["DSM-5-TR.pdf"], "claves": ["dos semanas", "2 semanas"]},
     {"tipo": "fuente", "grupo": "Diagnóstico (CIE-11)",
-     "pregunta": "¿Qué código tiene la esquizofrenia en la clasificación internacional de enfermedades?",
-     "fuentes": ["CIE-11.pdf"], "claves": ["6a20"]},
+     "pregunta": "En la nueva clasificación, ¿en qué agrupación quedaron la esquizofrenia y los trastornos delirantes de la CIE-10?",
+     "fuentes": ["CIE-11.pdf"], "claves": ["psicoticos primarios"]},
 
     # --- Guías, formulario, CYP y escalas ---
     {"tipo": "fuente", "grupo": "Guía (mhGAP)",
@@ -97,7 +119,7 @@ CASOS = [
     # --- Caso clínico que cruza fuentes ---
     {"tipo": "fuente", "grupo": "Caso clínico",
      "pregunta": "Un paciente con esquizofrenia tratado con clozapina deja de fumar. ¿Qué puede pasar?",
-     "fuentes": ["FT_Clozapina.pdf", LIBRO], "claves": ["1a2", "aument"]},
+     "fuentes": ["FT_Clozapina.pdf", LIBRO], "claves": ["1a2", "aument", "inductor", "reduc"]},
 
     # --- Abstención: la respuesta no está en los documentos ---
     {"tipo": "abstencion", "grupo": "Sin respuesta",
@@ -188,11 +210,81 @@ def verificar():
     print(f"\n{len(CASOS) - problemas}/{len(CASOS)} casos sin avisos.")
 
 
+def buscar(palabra, archivo=None):
+    """Lista los fragmentos que contienen la palabra, con un extracto alrededor."""
+    filtro = {"archivo": archivo} if archivo else None
+    r = rag.coleccion.get(where=filtro, include=["documents", "metadatas"])
+    objetivo = normalizar(palabra)
+    hallados = []
+    for texto, meta in zip(r["documents"], r["metadatas"]):
+        plano = " ".join(texto.split())
+        # Busca sin tildes ni mayúsculas, pero muestra el texto original
+        base = unicodedata.normalize("NFD", plano.lower())
+        base = "".join(c for c in base if unicodedata.category(c) != "Mn")
+        pos = base.replace(" ", "").find(objetivo)
+        if pos >= 0:
+            # Traduce la posición sin espacios a la posición en el texto con espacios
+            cuenta, i = 0, 0
+            while i < len(base) and cuenta < pos:
+                cuenta += base[i] != " "
+                i += 1
+            hallados.append((meta["archivo"], meta["pagina"], plano[max(0, i - 80):i + 160]))
+    hallados.sort(key=lambda h: (h[0], int(h[1])))
+    donde = f" en {archivo}" if archivo else ""
+    print(f"'{palabra}' aparece en {len(hallados)} fragmentos{donde}.\n")
+    for a, p, extracto in hallados[:20]:
+        print(f"[{a}, pág. {p}] ...{extracto}...\n")
+    if len(hallados) > 20:
+        print(f"(y {len(hallados) - 20} más)")
+
+
+def ranking(pregunta, archivo):
+    """Clasificación de un documento para una pregunta: ¿entra en el cupo y pasa el filtro?"""
+    v = rag.modelo_emb.encode([rag.PREFIJO_PREGUNTA + pregunta], normalize_embeddings=True)[0]
+    r = rag.coleccion.query(query_embeddings=[v.tolist()], n_results=15,
+                            where={"archivo": archivo}, include=["documents", "metadatas", "embeddings"])
+    elegidos = rag.recuperar(pregunta)
+    mejor = max((f["similitud"] for f in elegidos), default=0)
+    umbral = mejor - rag.MARGEN
+    cupo = rag.CUPO.get(archivo, rag.K_MIN)
+    usados = {(f["archivo"], int(f["pagina"]), f["texto"]) for f in elegidos}
+    print(f"Pregunta: {pregunta}")
+    print(f"{archivo}: cupo de {cupo} candidatos. Mejor fragmento general: {mejor:.3f}; "
+          f"umbral del filtro: {umbral:.3f}\n")
+    for i, (texto, meta, emb) in enumerate(zip(r["documents"][0], r["metadatas"][0], r["embeddings"][0]), 1):
+        sim = float(sum(a * b for a, b in zip(emb, v)))
+        if (meta["archivo"], int(meta["pagina"]), texto) in usados:
+            estado = "LLEGA AL MODELO"
+        elif i > cupo:
+            estado = "fuera del cupo"
+        elif sim < umbral:
+            estado = "lo corta el filtro"
+        else:
+            estado = "lo corta el tope (página o total)"
+        print(f"{i:2}. [{sim:.3f}] pág. {meta['pagina']:<4} {estado:<34} {' '.join(texto.split())[:70]}")
+
+
 def main():
+    if "--ranking" in sys.argv:
+        i = sys.argv.index("--ranking")
+        if len(sys.argv) <= i + 2:
+            raise SystemExit('Uso: python probar_rag.py --ranking "PREGUNTA" ARCHIVO')
+        ranking(sys.argv[i + 1], sys.argv[i + 2])
+        return
+    if "--buscar" in sys.argv:
+        i = sys.argv.index("--buscar")
+        if len(sys.argv) <= i + 1:
+            raise SystemExit('Uso: python probar_rag.py --buscar PALABRA [ARCHIVO]')
+        buscar(sys.argv[i + 1], sys.argv[i + 2] if len(sys.argv) > i + 2 else None)
+        return
     if "--verificar" in sys.argv:
         verificar()
         return
     usar_llm = "--llm" in sys.argv
+    pausa = 12
+    if "--pausa" in sys.argv:
+        pausa = float(sys.argv[sys.argv.index("--pausa") + 1])
+    errores_seguidos = 0
     tot = {"tabla": [0, 0], "fuente": [0, 0], "respuesta": [0, 0], "abstencion": [0, 0]}
     errores = 0
 
@@ -221,17 +313,29 @@ def main():
                 for f in fragmentos[:3]:
                     print(f"            [{f['similitud']:.3f}] {f['archivo']} pág. {f['pagina']}: {f['texto'][:60]!r}")
 
+        if usar_llm and errores_seguidos >= 2:
+            print("  RESPUESTA ERROR sin evaluar: el proveedor falló dos veces seguidas")
+            errores += 1
+            continue
         if usar_llm:
+            if n > 1 and pausa:
+                time.sleep(pausa)   # respeta el límite de peticiones por minuto
             try:
                 respuesta = rag.responder(caso["pregunta"])
             except Exception as e:   # un error del proveedor no debe cortar toda la prueba
                 print(f"  RESPUESTA ERROR {type(e).__name__}: {str(e)[:80]}")
                 errores += 1
+                errores_seguidos += 1
                 continue
             if respuesta.startswith("["):   # aviso de rag.py: límite alcanzado o proveedor caído
                 print(f"  RESPUESTA ERROR {respuesta[:110]}")
                 errores += 1
+                errores_seguidos += 1
+                if errores_seguidos == 2:
+                    print("\n  El proveedor falló dos veces seguidas: probablemente se agotó el cupo "
+                          "diario. Sigo solo con la búsqueda.")
                 continue
+            errores_seguidos = 0
             clave = "abstencion" if caso["tipo"] == "abstencion" else "respuesta"
             ok, detalle = respuesta_ok(respuesta, caso)
             tot[clave][1] += 1
@@ -245,10 +349,12 @@ def main():
     print(f"Tabla:      {tot['tabla'][0]}/{tot['tabla'][1]} búsquedas encontraron la tabla")
     print(f"Fuente:     {tot['fuente'][0]}/{tot['fuente'][1]} búsquedas encontraron una fuente válida")
     if usar_llm:
+        print(f"Modelo:     {rag.MODELO_LLM} ({rag.PROVEEDOR})")
         print(f"Respuesta:  {tot['respuesta'][0]}/{tot['respuesta'][1]} respuestas con las palabras clave")
         print(f"Abstención: {tot['abstencion'][0]}/{tot['abstencion'][1]} preguntas sin respuesta bien rechazadas")
         if errores:
-            print(f"            ({errores} sin evaluar por errores del proveedor)")
+            print(f"            ({errores} sin evaluar por errores del proveedor: "
+                  f"vuelve a correr la prueba más tarde o cambia de modelo)")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,14 @@
 # rag.py — RAG básico con PDFs y ChromaDB
 # Lee los PDFs de la carpeta "datos", los parte en fragmentos y guarda sus vectores
 # en ChromaDB (carpeta "chroma_db"). La próxima vez solo procesa los PDFs nuevos.
-# Luego busca los fragmentos más parecidos a tu pregunta y se los pasa al modelo (Ollama).
+# Luego busca los fragmentos más parecidos a tu pregunta y se los pasa al modelo de lenguaje,
+# que puede ser local (Ollama) o en la nube (Gemini o Groq).
 
 import os
-os.environ["HF_HUB_OFFLINE"] = "1"   # usa el modelo ya descargado (quítalo si cambias de modelo)
+# Usa el modelo ya descargado. Para descargarlo (primera vez, o en Colab): HF_HUB_OFFLINE=0
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+# SOLO_INDEXAR=1: indexa los PDFs y termina (útil en Colab; no pide clave del modelo)
+SOLO_INDEXAR = os.environ.get("SOLO_INDEXAR") == "1"
 
 import re
 import hashlib
@@ -12,7 +16,6 @@ from pathlib import Path
 
 import numpy as np
 import chromadb
-import ollama
 import pdfplumber
 from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
@@ -21,14 +24,30 @@ from sentence_transformers import SentenceTransformer
 # ---------------------------------------------------------------
 # 0) CONFIGURACIÓN: cambia aquí los valores para experimentar
 # ---------------------------------------------------------------
-MODELO_LLM = "qwen3:8b"        # o "gemma3:4b", "gemma3:12b", "llama3.2"...
+# Modelo de lenguaje: "gemini" o "groq" (nube, gratis, más rápidos) u "ollama" (local).
+# Los de la nube necesitan una clave en una variable de entorno (ver README).
+# En su plan gratuito, Google puede usar lo que envías para mejorar sus productos:
+# no mandes datos de pacientes por ahí.
+PROVEEDOR = "gemini"
+MODELOS = {
+    "gemini": "gemini-3.5-flash-lite",
+    "groq": "openai/gpt-oss-120b",
+    "ollama": "qwen3:8b",
+}
+MODELO_LLM = MODELOS[PROVEEDOR]
+_VARIABLES = {"gemini": "GEMINI_API_KEY", "groq": "GROQ_API_KEY"}
+if not SOLO_INDEXAR and PROVEEDOR in _VARIABLES and not os.environ.get(_VARIABLES[PROVEEDOR]):
+    raise SystemExit(f"Falta la clave de {PROVEEDOR}: define la variable de entorno "
+                     f"{_VARIABLES[PROVEEDOR]} (ver README), o pon PROVEEDOR = \"ollama\".")
+MAX_TOKENS_RESPUESTA = 700 if PROVEEDOR == "ollama" else 2000   # los de la nube cuentan su razonamiento
+
 MODELO_EMBEDDINGS = "intfloat/multilingual-e5-base"   # lee hasta ~300 palabras
 TAM_CHUNK = 200                # palabras por fragmento
 SOLAPE = 40                    # palabras repetidas entre fragmentos
 K_POR_ARCHIVO = 3              # candidatos que se buscan en cada PDF
 MARGEN = 0.03                  # se descarta lo que esté a más de esto del mejor fragmento
 MAX_FRAGMENTOS = 8             # tope de fragmentos que llegan al modelo
-VERSION_TEXTO = 4              # súbela cada vez que cambies cómo se extrae o divide el texto
+VERSION_TEXTO = 2              # súbela cada vez que cambies cómo se extrae o divide el texto
 
 CARPETA_DATOS = "datos"
 CARPETA_DB = "chroma_db"       # aquí ChromaDB guarda los vectores en disco
@@ -147,9 +166,12 @@ coleccion = cliente.get_or_create_collection(nombre_coleccion)
 
 
 def huella(ruta):
-    """Tamaño + fecha de modificación: si cambia, el PDF fue reemplazado."""
-    info = ruta.stat()
-    return f"{info.st_size}-{int(info.st_mtime)}"
+    """Huella del contenido: igual en cualquier computadora; cambia solo si cambia el PDF."""
+    h = hashlib.md5()
+    with open(ruta, "rb") as f:
+        for bloque in iter(lambda: f.read(1 << 20), b""):
+            h.update(bloque)
+    return h.hexdigest()
 
 
 def indexar_pdf(ruta):
@@ -203,6 +225,8 @@ for archivo in {m["archivo"] for m in todos["metadatas"]} - nombres_actuales:
 
 archivos = sorted(nombres_actuales)
 print(f"Base lista: {coleccion.count()} fragmentos de {len(archivos)} archivos.")
+if SOLO_INDEXAR:
+    raise SystemExit("Indexación terminada (SOLO_INDEXAR=1).")
 
 
 # ---------------------------------------------------------------
@@ -264,39 +288,89 @@ def responder(pregunta):
         f"Contexto:\n{contexto}\n\nPregunta: {pregunta}\n\nRespuesta en español:"
     )
 
-    opciones_extra = {}
-    if MODELO_LLM.startswith("qwen3"):
-        opciones_extra["think"] = False   # Qwen3: responder directo, sin "pensar en voz alta"
-
-        print("\nGenerando respuesta...", flush=True)
+    print("\nGenerando respuesta...", flush=True)
     partes = []
-    for trozo in ollama.chat(
-        model=MODELO_LLM,
-        messages=[{"role": "user", "content": prompt}],
-        options={
-            "num_ctx": 8192,
-            "temperature": 0.1,
-            "num_predict": 700,      # tope de tokens: evita respuestas interminables
-        },
-        stream=True,                 # recibe la respuesta de a poco
-        **opciones_extra,
-    ):
-        texto_parcial = trozo["message"]["content"]
-        partes.append(texto_parcial)
+    for trozo in generar(prompt):        # la respuesta llega de a poco (streaming)
+        partes.append(trozo)
         print(".", end="", flush=True)   # un punto por trozo: se ve que avanza
     print()
 
     texto = "".join(partes)
     if "</think>" in texto:
-        texto = texto.split("</think>")[-1]
+        texto = texto.split("</think>")[-1]   # por si el modelo razona en voz alta
     return texto.strip()
+
+
+# Direcciones de los proveedores en la nube (ambos aceptan el formato de OpenAI)
+NUBE = {
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY"),
+    "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY"),
+}
+_cliente = None
+
+
+def generar(prompt):
+    """Devuelve la respuesta del modelo en trozos de texto, sea local o en la nube."""
+    mensajes = [{"role": "user", "content": prompt}]
+
+    if PROVEEDOR == "ollama":
+        import ollama
+        extra = {"think": False} if MODELO_LLM.startswith("qwen3") else {}
+        for trozo in ollama.chat(
+            model=MODELO_LLM,
+            messages=mensajes,
+            options={"num_ctx": 8192, "temperature": 0.1, "num_predict": MAX_TOKENS_RESPUESTA},
+            stream=True,
+            **extra,
+        ):
+            yield trozo["message"]["content"]
+        return
+
+    global _cliente
+    import time
+    from openai import OpenAI, RateLimitError, InternalServerError, APIConnectionError, APITimeoutError
+    if _cliente is None:
+        url, variable = NUBE[PROVEEDOR]
+        clave = os.environ.get(variable)
+        if not clave:
+            raise SystemExit(f"Falta la clave: define la variable de entorno {variable} (ver README).")
+        _cliente = OpenAI(base_url=url, api_key=clave)
+
+    extra = {"reasoning_effort": "low"} if PROVEEDOR == "groq" else {}
+    # Errores pasajeros (servidor saturado, 503, cortes de red): se reintenta hasta 3 veces
+    for intento in range(4):
+        try:
+            respuesta = _cliente.chat.completions.create(
+                model=MODELO_LLM,
+                messages=mensajes,
+                temperature=0.1,
+                max_tokens=MAX_TOKENS_RESPUESTA,
+                stream=True,
+                **extra,
+            )
+            for trozo in respuesta:
+                if trozo.choices and trozo.choices[0].delta.content:
+                    yield trozo.choices[0].delta.content
+            return
+        except RateLimitError:
+            yield ("[Se alcanzó el límite gratuito del proveedor. Espera un minuto y vuelve a "
+                   "preguntar, o cambia PROVEEDOR en el bloque 0.]")
+            return
+        except (InternalServerError, APIConnectionError, APITimeoutError) as e:
+            if intento == 3:
+                yield (f"[El proveedor no responde ({type(e).__name__}). Prueba en unos minutos "
+                       "o cambia PROVEEDOR en el bloque 0.]")
+                return
+            espera = 2 ** (intento + 1)   # 2, 4 y 8 segundos
+            print(f"\n  (el servidor no respondió; reintento en {espera} s)", flush=True)
+            time.sleep(espera)
 
 
 # ---------------------------------------------------------------
 # 6) PROGRAMA PRINCIPAL: hacer preguntas hasta escribir "salir"
 # ---------------------------------------------------------------
 if __name__ == "__main__":
-    print(f"Listo (modelo: {MODELO_LLM}). Escribe tu pregunta (o 'salir' para terminar).")
+    print(f"Listo (modelo: {MODELO_LLM} en {PROVEEDOR}). Escribe tu pregunta (o 'salir' para terminar).")
     while True:
         pregunta = input("\nPregunta: ").strip()
         if pregunta.lower() in ("salir", "exit", "q"):

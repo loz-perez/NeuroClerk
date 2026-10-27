@@ -4,8 +4,6 @@ NeuroClerk es un asistente para psiquiatría que responde consultas sobre intera
 
 El estado de cada fase y los próximos pasos están en [HOJA_DE_RUTA.md](HOJA_DE_RUTA.md).
 
-Qué documentos poner en la carpeta `datos` y dónde conseguirlos: [DATOS.md](DATOS.md).
-
 > **Aviso:** es una herramienta de apoyo y un proyecto en desarrollo. No reemplaza el juicio clínico ni la consulta de las fuentes originales.
 
 ## Cómo funciona
@@ -18,30 +16,33 @@ flowchart LR
     C --> D
     D --> E[Embeddings<br/>multilingual-e5-base]
     E --> F[(ChromaDB<br/>chroma_db/)]
-    P[Pregunta] --> G[Buscar candidatos<br/>3 por archivo]
+    P[Pregunta] --> G[Buscar candidatos<br/>3 a 15 por archivo]
     F --> G
-    G --> H[Filtrar por similitud<br/>margen 0.03, máx. 8]
+    G --> H[Filtrar por similitud<br/>margen 0.03, máx. 10]
     H --> I[Prompt con reglas<br/>y citas]
     I --> J[LLM local<br/>qwen3:8b en Ollama]
     J --> R[Respuesta citada]
 ```
 
 1. **Cargar:** lee el texto de cada página con `pypdf` y une las palabras cortadas con guion ("dificul- tad" → "dificultad").
-2. **Tablas:** `pdfplumber` detecta las tablas y guarda cada una como un fragmento propio, con su título delante.
+2. **Tablas:** `pdfplumber` detecta las tablas y las guarda con su título delante: un fragmento por fila en las tablas con columnas, y uno por categoría (por ejemplo *Sustratos* e *Inhibidores*) en las listas agrupadas.
 3. **Dividir:** parte el texto en fragmentos de 200 palabras que se solapan 40, para no cortar una idea a la mitad.
 4. **Indexar:** convierte cada fragmento en un vector y lo guarda en ChromaDB. Solo se hace la primera vez, o cuando un PDF es nuevo o cambió.
-5. **Recuperar:** busca los 3 fragmentos más parecidos de **cada** archivo y descarta los que quedan muy por debajo del mejor.
+5. **Recuperar:** busca los fragmentos más parecidos de **cada** archivo (más candidatos en los documentos grandes) y descarta los que quedan muy por debajo del mejor.
 6. **Generar:** le pasa esos fragmentos al modelo con instrucciones de responder solo con el contexto y citar cada afirmación. La respuesta llega de a poco (streaming) y tiene un tope de 700 tokens.
 
 ## Estructura del proyecto
 
-```text
+```
 NeuroClerk/
 ├── .venv/                 # entorno virtual (no se sube a Git)
 ├── datos/                 # tus PDFs (no se suben a Git)
 ├── chroma_db/             # vectores guardados (no se sube a Git)
 ├── rag.py                 # el programa completo
 ├── probar_tablas.py       # pruebas automáticas de la extracción de tablas
+├── descargar_fichas.py    # descarga las fichas técnicas de CIMA
+├── fuentes.csv            # registro de los documentos de datos/
+├── DATOS.md               # qué documentos poner en datos/ y dónde conseguirlos
 ├── requirements.txt       # librerías principales
 ├── requirements-lock.txt  # versiones exactas de todo el entorno
 ├── .gitignore
@@ -87,14 +88,11 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
 
 - `requirements.txt` tiene solo las librerías principales; `requirements-lock.txt`, las versiones exactas de todo el entorno.
 - **Cada vez que instales una librería nueva**, regenera el lock en ese momento:
-
   ```powershell
   pip freeze > requirements-lock.txt
   ```
-
 - `pip freeze` no escribe la dirección de PyTorch CPU. Después de regenerarlo, agrega esta línea **al principio** del archivo; si no, falla la instalación de `torch==...+cpu`:
-
-  ```text
+  ```
   --extra-index-url https://download.pytorch.org/whl/cpu
   ```
 
@@ -102,22 +100,49 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
 
 PyTorch solo calcula los embeddings, y gracias a ChromaDB eso pesa únicamente al indexar. La respuesta la genera Ollama, que usa la GPU por su cuenta. La versión CPU pesa ~200 MB frente a más de 2 GB, y no depende de tener una tarjeta NVIDIA. Con una GPU NVIDIA y reindexaciones frecuentes, conviene instalar la versión CUDA desde [pytorch.org](https://pytorch.org/get-started/locally/).
 
+## Modelo de lenguaje: local o en la nube
+
+En el bloque 0 de `rag.py`, `PROVEEDOR` elige quién redacta la respuesta:
+
+| `PROVEEDOR` | Modelo | Costo | Velocidad | Privacidad |
+| --- | --- | --- | --- | --- |
+| `"gemini"` (por defecto) | `gemini-3.8-flash` | Plan gratuito | Rápido | En el plan gratuito, Google puede usar lo enviado para mejorar sus productos |
+| `"groq"` | `openai/gpt-oss-120b` | Plan gratuito | Muy rápido | Límite de 8.000 tokens por minuto: alcanza para 1 o 2 preguntas por minuto |
+| `"ollama"` | `qwen3:8b` | Gratis | Lento en CPU | Nada sale de la computadora |
+
+Los proveedores en la nube solo reciben la pregunta y los fragmentos encontrados, nunca los PDFs completos. Aun así, **no los uses con datos de pacientes**: para eso está `"ollama"`.
+
+### Configurar la clave
+
+1. Crea una clave gratuita:
+   - Gemini: [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+   - Groq: [console.groq.com/keys](https://console.groq.com/keys)
+2. Guárdala como variable de entorno (no dentro de `rag.py`, para que no termine en Git):
+   ```powershell
+   setx GEMINI_API_KEY "tu_clave"
+   setx GROQ_API_KEY "tu_clave"
+   ```
+3. Cierra y vuelve a abrir VS Code para que la terminal vea la variable.
+
+Si falta la clave, el programa avisa al arrancar. Si se alcanza el límite gratuito, la respuesta lo dice: espera un minuto o cambia de proveedor. Los límites actuales de cada plan se ven en [AI Studio](https://aistudio.google.com/rate-limit) y en la [consola de Groq](https://console.groq.com/settings/limits).
+
 ## Uso
 
-1. Copia tus PDFs en la carpeta `datos/` con nombres claros (`FT_Litio.pdf`, no `FT_63845.pdf`), porque el modelo cita el nombre del archivo.
+1. Copia tus PDFs en la carpeta `datos/` con nombres claros (`FT_Litio.pdf`, no `FT_63845.pdf`), porque el modelo cita el nombre del archivo. Las fichas técnicas de [DATOS.md](DATOS.md) se descargan solas con:
+   ```powershell
+   python .\descargar_fichas.py
+   ```
 2. Ejecuta:
-
    ```powershell
    python .\rag.py
    ```
-
 3. Escribe tus preguntas. Para terminar, escribe `salir`.
 
 La primera ejecución tarda varios minutos porque indexa todo. Las siguientes arrancan en segundos.
 
 Para cada pregunta, el programa muestra los fragmentos usados con su puntaje de similitud. Mientras el modelo escribe aparecen puntos, y al final la respuesta:
 
-```text
+```
 Fragmentos usados:
   -> [0.909] InteraccionesFarmacoloigicas_pr.pdf, página 9: Tabla 1. Fármacos que pueden causar...
   -> [0.894] InteraccionesFarmacoloigicas_pr.pdf, página 9: de receptores), en los procesos...
@@ -139,10 +164,11 @@ Todo se ajusta en el bloque 0 de `rag.py`:
 | `MODELO_EMBEDDINGS` | `intfloat/multilingual-e5-base` | Modelo que convierte texto en vectores |
 | `TAM_CHUNK` | `200` | Palabras por fragmento |
 | `SOLAPE` | `40` | Palabras repetidas entre fragmentos seguidos |
-| `K_POR_ARCHIVO` | `3` | Candidatos que se buscan en cada PDF |
+| `K_MIN`, `K_MAX` | `3`, `15` | Candidatos que se buscan en cada PDF: 3 en una ficha corta, hasta 15 en un libro |
+| `FRAGMENTOS_POR_CANDIDATO` | `100` | Un candidato más por cada 100 fragmentos del documento |
 | `MARGEN` | `0.03` | Se descartan los fragmentos que quedan más de esto por debajo del mejor |
-| `MAX_FRAGMENTOS` | `8` | Tope de fragmentos que llegan al modelo |
-| `VERSION_TEXTO` | `2` | Súbela cada vez que cambies cómo se extrae o se divide el texto |
+| `MAX_FRAGMENTOS` | `10` | Tope de fragmentos que llegan al modelo |
+| `VERSION_TEXTO` | `3` | Súbela cada vez que cambies cómo se extrae o se divide el texto |
 
 En `responder` se configura el modelo: `temperature: 0.1` para que se apegue al texto, `num_ctx: 8192` para que quepan todos los fragmentos y `num_predict: 700` como tope de la respuesta.
 
@@ -178,33 +204,31 @@ Las tablas que fallan son largas y con columnas: se parten en trozos que mezclan
 
 Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas y compara.
 
-## 📚 Documentos de prueba
+## Documentos de prueba
 
-Los PDFs no se incluyen en el repositorio por su tamaño y por derechos de autor. Cada persona debe conseguirlos y copiarlos en la carpeta `datos/`.
+| Archivo | Contenido | Páginas |
+| --- | --- | --- |
+| `dsm5.pdf` | DSM-5, criterios diagnósticos (escaneado con OCR) | 1000 |
+| `InteraccionesFarmacoloigicas_pr.pdf` | Introducción a las interacciones farmacológicas (SEFH) | 367 |
+| `FT_Sertralina.pdf`, `FT_Litio.pdf`, `FT_Quetiapina.pdf`, `FT_Clozapina.pdf` | Fichas técnicas de la AEMPS ([CIMA](https://cima.aemps.es)) | 15–28 c/u |
 
-| Archivo | Contenido | Páginas | Disponibilidad |
-| --- | --- | --- | --- |
-| `dsm5.pdf` | DSM-5, criterios diagnósticos (escaneado con OCR) | 1000 | Protegido por derechos de autor, no se puede compartir |
-| `InteraccionesFarmacoloigicas_pr.pdf` | Introducción a las interacciones farmacológicas (SEFH) | 367 | Publicación de la SEFH |
-| `FT_Sertralina.pdf`, `FT_Litio.pdf`, `FT_Quetiapina.pdf`, `FT_Clozapina.pdf` | Fichas técnicas de la AEMPS | 15–28 c/u | Públicas y gratuitas en CIMA |
+Los PDFs no se suben al repositorio por su tamaño y por derechos de autor.
 
-### Cómo descargar las fichas técnicas de CIMA
+## Problemas encontrados y cómo se resolvieron
 
-Las fichas técnicas de la Agencia Española de Medicamentos (AEMPS) son públicas y se descargan gratis desde [CIMA](https://cima.aemps.es):
+### Instalación
 
-1. Entra en [cima.aemps.es](https://cima.aemps.es) y busca el principio activo (por ejemplo, *sertralina*).
-2. Elige una presentación de la lista de resultados. Cualquiera sirve, porque la información clínica es casi igual entre laboratorios.
-3. En la ficha del medicamento, abre el documento **Ficha técnica** en formato PDF y descárgalo.
-4. Renómbralo con un nombre claro, por ejemplo `FT_Sertralina.pdf`. CIMA lo descarga con el número de registro (`FT_63845.pdf`), y el nombre del archivo es lo que aparece en las citas de cada respuesta.
-5. Cópialo en `datos/` y vuelve a ejecutar `python .\rag.py`. Los archivos nuevos se indexan automáticamente.
-
-### Sobre el DSM-5
-
-El DSM-5 pertenece a la American Psychiatric Association y no se puede redistribuir. Si tienes un ejemplar en PDF con licencia propia, puedes añadirlo a `datos/` para tu uso personal. Si no, el proyecto funciona igual con las fichas técnicas y otros documentos públicos; solo no podrá responder preguntas sobre criterios diagnósticos.
-
-> Si un PDF es escaneado y no tiene capa de texto, NeuroClerk todavía no puede leerlo (falta el OCR, ver *Limitaciones conocidas*).
-
-### Problemas encontrados y cómo se resolvieron
+| Problema | Causa | Solución |
+| --- | --- | --- |
+| "La ejecución de scripts está deshabilitada" | PowerShell bloquea `activate` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| Muchos errores de dependencias | PyTorch todavía no estaba disponible para la versión más nueva de Python | Usar Python 3.12 e instalar PyTorch CPU primero |
+| `No suitable Python runtime found` | Python 3.12 no estaba instalado | Instalarlo; puede convivir con otras versiones |
+| `cryptography>=3.1 is required for AES` | El PDF de interacciones está cifrado | `pip install cryptography` |
+| `NameError: name 'paso' is not defined` | Se borró una línea al editar | Usar el archivo completo en lugar de pegar trozos |
+| `model 'qwen3:4b' not found` | El modelo no estaba descargado | `ollama pull <modelo>`; verificar con `ollama list` |
+| Aviso "unauthenticated requests to the HF Hub" | Se consultaba Hugging Face en cada arranque | `HF_HUB_OFFLINE=1` con el modelo ya descargado |
+| El entorno dejó de funcionar al renombrar la carpeta a `NeuroClerk` | En Windows, `.venv` guarda la ruta completa de la carpeta | Borrar `.venv`, recrearlo e instalar desde el lock; volver a elegir el intérprete en VS Code |
+| `ModuleNotFoundError: No module named 'pdfplumber'` | El lock se generó antes de instalar pdfplumber | `pip install -r requirements.txt` y regenerar el lock |
 
 ### Calidad de la búsqueda
 

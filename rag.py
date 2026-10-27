@@ -44,10 +44,11 @@ MAX_TOKENS_RESPUESTA = 700 if PROVEEDOR == "ollama" else 2000   # los de la nube
 MODELO_EMBEDDINGS = "intfloat/multilingual-e5-base"   # lee hasta ~300 palabras
 TAM_CHUNK = 200                # palabras por fragmento
 SOLAPE = 40                    # palabras repetidas entre fragmentos
-K_POR_ARCHIVO = 3              # candidatos que se buscan en cada PDF
+K_MIN, K_MAX = 3, 15           # candidatos por PDF: 3 en una ficha corta, hasta 15 en un libro
+FRAGMENTOS_POR_CANDIDATO = 100 # un candidato más por cada 100 fragmentos del documento
 MARGEN = 0.03                  # se descarta lo que esté a más de esto del mejor fragmento
-MAX_FRAGMENTOS = 8             # tope de fragmentos que llegan al modelo
-VERSION_TEXTO = 2              # súbela cada vez que cambies cómo se extrae o divide el texto
+MAX_FRAGMENTOS = 10            # tope de fragmentos que llegan al modelo
+VERSION_TEXTO = 3              # súbela cada vez que cambies cómo se extrae o divide el texto
 
 CARPETA_DATOS = "datos"
 CARPETA_DB = "chroma_db"       # aquí ChromaDB guarda los vectores en disco
@@ -79,58 +80,97 @@ def limpiar(celda):
     return " ".join((celda or "").split())
 
 
-def tabla_a_texto(filas):
-    """Convierte una tabla (lista de filas) en (título, líneas de texto)."""
-    # Cada celda puede tener varios renglones (p. ej. una columna de fármacos)
+def tabla_a_unidades(filas):
+    """Convierte una tabla en (título, encabezado, unidades).
+
+    Cada unidad es (etiqueta, texto) y terminará en su propio fragmento:
+    - Tabla por categorías (p. ej. Sustratos | Inhibidores | Inductores, con listas de
+      fármacos debajo): una unidad por categoría, con la etiqueta de la categoría.
+    - Tabla por filas (p. ej. Fármaco | Interacciona con | Efecto): una unidad por fila,
+      escrita como "columna: valor; columna: valor".
+    - Tabla tipo lista (sin encabezado): una sola unidad con todos los elementos.
+    """
     filas = [[(c or "").strip() for c in f] for f in filas]
     filas = [f for f in filas if any(f)]
     if not filas:
-        return "", []
+        return "", None, []
 
     # Si la primera fila tiene una sola celda con texto, es el título de la tabla
     titulo = ""
     if sum(1 for c in filas[0] if c) == 1:
         titulo = limpiar(next(c for c in filas[0] if c))
         filas = filas[1:]
+    if not filas:
+        return titulo, None, []
 
-    lineas = []
-    encabezado = filas[0] if len(filas) >= 3 and sum(1 for c in filas[0] if c) >= 2 else None
-    if encabezado:
-        # Tabla con encabezado: cada fila se escribe como "columna: valor; columna: valor"
-        nombres = [limpiar(c) for c in encabezado]
-        for f in filas[1:]:
-            partes = [f"{n}: {limpiar(v)}" if n else limpiar(v)
-                      for n, v in zip(nombres, f) if limpiar(v)]
+    cabecera = filas[0]
+    llenas = sum(1 for c in cabecera if c)
+    resto = filas[1:]
+
+    # 1) Por categorías: cabecera con huecos (una categoría abarca varias columnas)
+    #    y celdas de datos que son listas de varios elementos
+    con_huecos = 0 < llenas < len(cabecera) and bool(cabecera[0])
+    listas = resto and sum(c.count("\n") for f in resto for c in f) >= 2 * len(cabecera)
+    if llenas >= 2 and con_huecos and listas:
+        etiquetas, actual = [], ""
+        for c in cabecera:
+            actual = limpiar(c) or actual      # la celda vacía hereda la categoría de la izquierda
+            etiquetas.append(actual)
+        grupos = {}
+        for f in resto:
+            for etiqueta, celda in zip(etiquetas, f):
+                grupos.setdefault(etiqueta, []).extend(
+                    limpiar(x) for x in celda.split("\n") if limpiar(x))
+        unidades = [(e, ", ".join(v)) for e, v in grupos.items() if v]
+        return titulo, tuple(etiquetas), unidades
+
+    # 2) Por filas: cabecera completa y al menos una fila de datos
+    if llenas >= 2 and llenas == len(cabecera) and resto:
+        nombres = [limpiar(c) for c in cabecera]
+        unidades = []
+        for f in resto:
+            partes = [f"{n}: {limpiar(v)}" for n, v in zip(nombres, f) if limpiar(v)]
             if partes:
-                lineas.append("; ".join(partes))
-    else:
-        # Tabla tipo lista: todos los elementos separados por comas
-        elementos = [limpiar(x) for f in filas for c in f for x in c.split("\n") if limpiar(x)]
-        if elementos:
-            lineas.append(", ".join(elementos))
-    return titulo, lineas
+                unidades.append(("", "; ".join(partes)))
+        return titulo, tuple(nombres), unidades
+
+    # 3) Tipo lista: todos los elementos separados por comas
+    elementos = [limpiar(x) for f in filas for c in f for x in c.split("\n") if limpiar(x)]
+    return titulo, None, [("", ", ".join(elementos))] if elementos else []
 
 
 def cargar_tablas(ruta, tam=TAM_CHUNK):
-    """Devuelve fragmentos de tablas; cada uno lleva el título delante."""
+    """Devuelve fragmentos de tablas; cada uno lleva delante el título (y la categoría)."""
     fragmentos = []
+    ultimo_titulo, ultimo_encabezado = "", None
     with pdfplumber.open(ruta) as pdf:
         for numero, pagina in enumerate(pdf.pages, start=1):
             try:
-                tablas = pagina.extract_tables()
+                encontradas = pagina.find_tables()
+                # Orden de lectura: primero la mitad izquierda de la página, luego la derecha
+                # (muchos PDFs tienen dos páginas del libro por hoja), y de arriba abajo
+                mitad = pagina.width / 2
+                encontradas.sort(key=lambda t: ((t.bbox[0] + t.bbox[2]) / 2 > mitad, t.bbox[1]))
+                tablas = [t.extract() for t in encontradas]
             except Exception:
                 continue   # alguna página rara no debe frenar todo
             for filas in tablas:
-                titulo, lineas = tabla_a_texto(filas)
-                texto = " ".join(lineas)
-                if len(texto.split()) < 5:
-                    continue   # tablas vacías o casi vacías
-                prefijo = f"{titulo}: " if titulo else "Tabla: "
-                palabras = texto.split()
-                # Tablas largas: se parten, pero cada trozo repite el título
-                for i in range(0, len(palabras), tam):
-                    trozo = " ".join(palabras[i:i + tam])
-                    fragmentos.append({"pagina": numero, "texto": prefijo + trozo})
+                titulo, encabezado, unidades = tabla_a_unidades(filas)
+                # Tabla que sigue de una página anterior: sin título pero con el mismo encabezado
+                if not titulo and encabezado and encabezado == ultimo_encabezado:
+                    titulo = f"{ultimo_titulo} (continuación)"
+                if titulo and encabezado:
+                    ultimo_titulo, ultimo_encabezado = titulo.replace(" (continuación)", ""), encabezado
+                for etiqueta, texto in unidades:
+                    palabras = texto.split()
+                    if len(palabras) < 3:
+                        continue   # celdas sueltas sin contenido útil
+                    prefijo = titulo or "Tabla"
+                    prefijo += f" — {etiqueta}: " if etiqueta else ": "
+                    # Unidades largas: se parten, pero cada trozo repite título y categoría
+                    for i in range(0, len(palabras), tam):
+                        trozo = " ".join(palabras[i:i + tam])
+                        fragmentos.append({"pagina": numero, "texto": prefijo + trozo})
     return fragmentos
 
 
@@ -224,6 +264,13 @@ for archivo in {m["archivo"] for m in todos["metadatas"]} - nombres_actuales:
     coleccion.delete(where={"archivo": archivo})
 
 archivos = sorted(nombres_actuales)
+
+# Cuántos fragmentos tiene cada documento: los grandes reciben más candidatos en la búsqueda
+_tamanos = {}
+for m in coleccion.get(include=["metadatas"])["metadatas"]:
+    _tamanos[m["archivo"]] = _tamanos.get(m["archivo"], 0) + 1
+CUPO = {a: max(K_MIN, min(K_MAX, round(_tamanos.get(a, 0) / FRAGMENTOS_POR_CANDIDATO)))
+        for a in archivos}
 print(f"Base lista: {coleccion.count()} fragmentos de {len(archivos)} archivos.")
 if SOLO_INDEXAR:
     raise SystemExit("Indexación terminada (SOLO_INDEXAR=1).")
@@ -233,15 +280,15 @@ if SOLO_INDEXAR:
 # 4) RECUPERAR: los fragmentos más parecidos, de CADA archivo,
 #    descartando los que se parecen mucho menos que el mejor
 # ---------------------------------------------------------------
-def recuperar(pregunta, k_por_archivo=K_POR_ARCHIVO, margen=MARGEN, max_total=MAX_FRAGMENTOS):
+def recuperar(pregunta, k_por_archivo=None, margen=MARGEN, max_total=MAX_FRAGMENTOS):
     v = modelo_emb.encode([PREFIJO_PREGUNTA + pregunta], normalize_embeddings=True)[0]
 
-    # Paso 1: candidatos, los k mejores de cada archivo (ChromaDB hace la búsqueda)
+    # Paso 1: candidatos, los mejores de cada archivo (más candidatos en los documentos grandes)
     candidatos = []
     for archivo in archivos:
         r = coleccion.query(
             query_embeddings=[v.tolist()],
-            n_results=k_por_archivo,
+            n_results=k_por_archivo or CUPO[archivo],
             where={"archivo": archivo},
             include=["documents", "metadatas", "embeddings"],
         )

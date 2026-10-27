@@ -14,52 +14,56 @@ import rag   # al importarlo se abre ChromaDB y se indexa lo que falte
 
 ARCHIVO = "Interacciones_Farmacologicas_SEFH.pdf"   # nombre del libro de interacciones en datos/
 
-# Cada caso: una pregunta, la tabla que debería aparecer entre los fragmentos usados
-# y palabras que están en esa tabla pero no en el texto normal de alrededor.
+# Cada caso: una pregunta, las fuentes que se aceptan como correctas y palabras clave.
+# - "tabla": la tabla del libro de interacciones que contiene la respuesta.
+# - "fichas": fichas técnicas que también la contienen (cualquier página cuenta).
+# - "claves": palabras que deberían aparecer en la respuesta y NO están en la pregunta.
+#   En los casos 1, 2, 3 y 7 son fármacos que figuran SOLO en la tabla, en ninguna de las
+#   fichas: si la respuesta los nombra, el modelo usó la tabla.
 CASOS = [
     {
         "pregunta": "¿Qué fármacos pueden causar síndrome neuroléptico maligno?",
-        "pagina": 9,
-        "titulo": "Tabla 1. Fármacos que pueden causar Síndrome Neuroléptico Maligno",
-        "claves": ["amantadina", "tolcapona", "metilfenidato"],
+        "tabla": (9, "Tabla 1. Fármacos que pueden causar Síndrome Neuroléptico Maligno"),
+        "fichas": [],
+        "claves": ["pergolida", "tiopropenazina", "tolcapona"],
     },
     {
         "pregunta": "¿Qué fármacos pueden causar síndrome serotoninérgico?",
-        "pagina": 10,
-        "titulo": "Tabla 2. Fármacos que pueden causar Síndrome Serotoninérgico",
-        "claves": ["tramadol", "linezolid", "dextrometorfano"],
+        "tabla": (10, "Tabla 2. Fármacos que pueden causar Síndrome Serotoninérgico"),
+        "fichas": [],
+        "claves": ["dapoxetina", "metiltionina", "tapentadol"],
     },
     {
         "pregunta": "¿Qué fármacos pueden prolongar el segmento QT?",
-        "pagina": 11,
-        "titulo": "Tabla 3. Fármacos que pueden prolongar el segmento QT",
-        "claves": ["metadona", "quetiapina", "citalopram"],
+        "tabla": (11, "Tabla 3. Fármacos que pueden prolongar el segmento QT"),
+        "fichas": [],
+        "claves": ["ebastina", "retigabina", "piperaquina", "eribulina"],
     },
     {
         "pregunta": "¿Qué interacción tienen los IECA con el litio?",
-        "pagina": 177,
-        "titulo": "Tabla 5. Interacciones farmacocinéticas de IECA",
-        "claves": ["litio", "excreción"],
+        "tabla": (177, "Tabla 5. Interacciones farmacocinéticas de IECA"),
+        "fichas": ["FT_Litio.pdf", "FT_Enalapril.pdf"],
+        "claves": ["toxicidad", "concentraci", "nivel"],
     },
     {
         "pregunta": "¿Qué isoenzimas del citocromo P450 metabolizan la clozapina?",
-        "pagina": 265,
-        "titulo": "Tabla 7. Isoformas del citocromo P450",
-        "claves": ["cyp1a2"],
+        "tabla": (265, "Tabla 7. Isoformas del citocromo P450"),
+        "fichas": ["FT_Clozapina.pdf"],
+        "claves": ["cyp1a2", "1a2"],
     },
     {
         "pregunta": "¿Cómo se metaboliza el alprazolam?",
-        "pagina": 268,
-        "titulo": "Tabla 9. Metabolismo de las benzodiazepinas",
-        "claves": ["cyp3a4"],
+        "tabla": (268, "Tabla 9. Metabolismo de las benzodiazepinas"),
+        "fichas": ["FT_Alprazolam.pdf"],
+        "claves": ["cyp3a4", "3a4"],
     },
     {
-        # Caso difícil a propósito: esta tabla tiene dos columnas (Sustratos / Inhibidores)
-        # y la extracción actual las junta en una sola lista. Puede fallar la respuesta.
+        # Caso difícil a propósito: la tabla tiene dos columnas (Sustratos / Inhibidores)
+        # y la extracción actual las junta. Estas claves son inhibidores que solo están ahí.
         "pregunta": "¿Qué fármacos son inhibidores del CYP2D6?",
-        "pagina": 20,
-        "titulo": "Tabla 6. Sustratos e inhibidores del CYP2D6",
-        "claves": ["paroxetina", "bupropi"],
+        "tabla": (20, "Tabla 6. Sustratos e inhibidores del CYP2D6"),
+        "fichas": [],
+        "claves": ["imatinib", "pazopanib", "cinacalcet"],
         "dificil": True,
     },
 ]
@@ -72,16 +76,21 @@ def normalizar(texto):
 
 
 def es_la_tabla(fragmento, caso):
+    pagina, titulo = caso["tabla"]
     return (
         normalizar(fragmento["archivo"]) == normalizar(ARCHIVO)
-        and int(fragmento["pagina"]) == caso["pagina"]
-        and normalizar(fragmento["texto"]).startswith(normalizar(caso["titulo"]))
+        and int(fragmento["pagina"]) == pagina
+        and normalizar(fragmento["texto"]).startswith(normalizar(titulo))
     )
+
+
+def es_ficha_valida(fragmento, caso):
+    return normalizar(fragmento["archivo"]) in {normalizar(f) for f in caso["fichas"]}
 
 
 def main():
     usar_llm = "--llm" in sys.argv
-    ok_busqueda = ok_respuesta = errores = 0
+    ok_tabla = ok_fuente = ok_respuesta = errores = 0
 
     # Si el nombre del libro no coincide, todas las pruebas fallarían: mejor avisar ya
     if normalizar(ARCHIVO) not in {normalizar(a) for a in rag.archivos}:
@@ -89,21 +98,35 @@ def main():
         raise SystemExit(f"No encuentro '{ARCHIVO}' en datos/. Cambia la línea ARCHIVO "
                          f"al principio de este script. Archivos parecidos: {parecidos}")
 
+    for caso in CASOS:
+        for clave in caso["claves"]:
+            if clave in normalizar(caso["pregunta"]):
+                print(f"AVISO: la clave '{clave}' está en la pregunta: el caso es demasiado fácil")
+
     for n, caso in enumerate(CASOS, start=1):
         etiqueta = " (difícil)" if caso.get("dificil") else ""
         print(f"\n[{n}] {caso['pregunta']}{etiqueta}")
 
         fragmentos = rag.recuperar(caso["pregunta"])
-        posicion = next((i for i, f in enumerate(fragmentos, 1) if es_la_tabla(f, caso)), None)
+        p_tabla = next((i for i, f in enumerate(fragmentos, 1) if es_la_tabla(f, caso)), None)
+        p_ficha = next((i for i, f in enumerate(fragmentos, 1) if es_ficha_valida(f, caso)), None)
 
-        if posicion:
-            ok_busqueda += 1
-            sim = fragmentos[posicion - 1]["similitud"]
-            print(f"  BÚSQUEDA  OK    tabla en el puesto {posicion} de {len(fragmentos)} (similitud {sim:.3f})")
+        if p_tabla:
+            ok_tabla += 1
+            sim = fragmentos[p_tabla - 1]["similitud"]
+            print(f"  TABLA     OK    puesto {p_tabla} de {len(fragmentos)} (similitud {sim:.3f})")
         else:
-            print(f"  BÚSQUEDA  FALLA no apareció '{caso['titulo']}' (pág. {caso['pagina']})")
+            pagina, titulo = caso["tabla"]
+            print(f"  TABLA     FALLA no apareció '{titulo}' (pág. {pagina})")
+        if p_tabla or p_ficha:
+            ok_fuente += 1
+            if not p_tabla:
+                f = fragmentos[p_ficha - 1]
+                print(f"  FUENTE    OK    {f['archivo']} pág. {f['pagina']} en el puesto {p_ficha}")
+        else:
+            print("  FUENTE    FALLA ninguna fuente válida; vinieron:")
             for f in fragmentos[:3]:
-                print(f"            vino: [{f['similitud']:.3f}] {f['archivo']} pág. {f['pagina']}: {f['texto'][:60]!r}")
+                print(f"            [{f['similitud']:.3f}] {f['archivo']} pág. {f['pagina']}: {f['texto'][:60]!r}")
 
         if usar_llm:
             try:
@@ -126,10 +149,11 @@ def main():
 
     total = len(CASOS)
     print("\n" + "=" * 60)
-    print(f"Búsqueda:  {ok_busqueda}/{total} tablas encontradas")
+    print(f"Tabla:     {ok_tabla}/{total} búsquedas encontraron la tabla")
+    print(f"Fuente:    {ok_fuente}/{total} búsquedas encontraron una fuente válida (tabla o ficha)")
     if usar_llm:
         validas = total - errores
-        print(f"Respuesta: {ok_respuesta}/{validas} respuestas usan datos de la tabla")
+        print(f"Respuesta: {ok_respuesta}/{validas} respuestas mencionan las palabras clave")
         if errores:
             print(f"           ({errores} sin evaluar por errores del proveedor; vuelve a "
                   f"correr la prueba más tarde o cambia de modelo)")

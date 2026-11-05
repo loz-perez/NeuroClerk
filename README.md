@@ -12,18 +12,18 @@ Qué documentos usar y dónde conseguirlos, en [DATOS.md](DATOS.md).
 
 ```mermaid
 flowchart LR
-    A[PDFs en datos/] --> B[Extraer texto<br/>pypdf]
-    A --> C[Extraer tablas<br/>pdfplumber]
-    B --> D[Dividir en fragmentos<br/>200 palabras, solape 40]
+    A["PDFs en datos/"] --> B["Extraer texto<br/>pypdf"]
+    A --> C["Extraer tablas<br/>pdfplumber"]
+    B --> D["Dividir en fragmentos<br/>200 palabras, solape 40"]
     C --> D
-    D --> E[Embeddings<br/>multilingual-e5-base]
-    E --> F[(ChromaDB<br/>chroma_db/)]
-    P[Pregunta] --> G[Buscar candidatos<br/>3 a 15 por archivo]
+    D --> E["Embeddings<br/>multilingual-e5-base"]
+    E --> F[("ChromaDB<br/>chroma_db/")]
+    P["Pregunta"] --> G["Buscar candidatos<br/>3 a 15 por archivo"]
     F --> G
-    G --> H[Filtrar por similitud<br/>margen 0.03, máx. 12]
-    H --> I[Prompt con reglas<br/>y citas]
-    I --> J[Modelo de lenguaje<br/>Gemini, Groq u Ollama]
-    J --> R[Respuesta citada]
+    G --> H["Filtrar por similitud<br/>margen 0.03, máx. 12"]
+    H --> I["Prompt con reglas<br/>y citas"]
+    I --> J["Modelo de lenguaje<br/>Gemini, Groq u Ollama"]
+    J --> R["Respuesta citada"]
 ```
 
 1. **Cargar:** lee el texto de cada página con `pypdf` y une las palabras cortadas con guion ("dificul- tad" → "dificultad").

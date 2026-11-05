@@ -29,7 +29,7 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 | Base vectorial | ChromaDB 1.5.9, guardada en disco | Evita recalcular los vectores en cada ejecución |
 | Lectura de PDFs | pypdf (texto) y pdfplumber (tablas por filas y categorías) | pypdf convierte las tablas en listas sin título que la búsqueda no encuentra |
 | Indexación | Local, o en Google Colab con GPU | Indexar ~3.300 páginas en CPU tarda horas |
-| Pruebas | `probar_rag.py` y la planilla `casos_de_prueba_NeuroClerk.xlsx` | Medir cada cambio con los mismos casos y guardar el historial |
+| Pruebas | `probar_rag.py` y la planilla `casos_de_prueba_NeuroClerk.xlsx`; `test_rag.py` con pytest para las funciones puras | Medir cada cambio con los mismos casos y guardar el historial; comprobar la lógica en menos de un segundo, sin modelo ni base |
 | Interfaz | Terminal; Streamlit en la fase 4 | Para probar sin depender de una interfaz |
 | Control de versiones | Git y GitHub (repositorio privado), una rama por función | Para volver a una versión que funciona si algo se rompe |
 
@@ -124,6 +124,7 @@ Primero se cierra la fase 2 con los casos que fallan y las reglas de seguridad, 
 - [x] Límite de fragmentos por página y filtro de casi duplicados.
 - [x] Medir el tope de 12 fragmentos y la pregunta nueva de la CIE-11.
 - [ ] Resolver los casos de la CIE-11, el PHQ-9 y la mhGAP.
+- [ ] Corregir `_parecido`: devuelve 0.0 con dos textos idénticos, así que no los descarta como duplicados. Hay una prueba marcada como `xfail` en `test_rag.py`; al corregirlo, quitar la marca y volver a medir.
 - [ ] Agregar al prompt la regla de no dar dosis que no estén textuales en un fragmento citado.
 - [ ] Flujo de advertencias para consultas de combinación de fármacos.
 - [ ] Escribir los casos clínicos ficticios: pacientes con su medicación, para la consulta farmacológica, y notas en texto libre, para el SOAP.

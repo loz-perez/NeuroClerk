@@ -3,3 +3,4 @@ __pycache__/
 datos/
 chroma_db/
 NeuroClerk.zip
+.pytest_cache/

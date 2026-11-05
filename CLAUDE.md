@@ -26,7 +26,12 @@ python .\probar_rag.py --llm                          # además pide las respues
 python .\probar_rag.py --llm --modelo NOMBRE --pausa 15
 python .\probar_rag.py --buscar PALABRA [ARCHIVO]     # qué fragmentos contienen una palabra
 python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO   # qué filtro deja afuera a un fragmento
+
+.venv\Scripts\python.exe probar_rag.py --llm --exportar   # guarda las respuestas en evaluaciones/respuestas.json
+.venv-ragas\Scripts\python.exe evaluar_ragas.py [--limite N] [--pausa S] [--resumen]   # fidelidad y relevancia con Ragas
 ```
+
+`evaluar_ragas.py` corre siempre en `.venv-ragas` (`requirements-ragas.txt`): Ragas arrastra LangChain y baja `openai` a 1.x, y `rag.py` usa 3.x. No instalarlo en `.venv`, no importarlo desde `rag.py` ni importar `rag.py` desde `evaluar_ragas.py`; se comunican por el JSON. `test_rag.py` importa sus funciones puras, así que Ragas debe seguir importándose solo dentro de `evaluar()`.
 
 `test_rag.py` corre sin el modelo, la base, los PDFs ni claves. `probar_rag.py` mide la búsqueda y las respuestas, necesita `datos/` y `chroma_db/`, que no están en Git, y no tiene una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. No hay linter ni CI.
 
@@ -65,6 +70,7 @@ Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (ca
 - **Después de cambiar la extracción o la búsqueda:** volver a correr las pruebas y anotar el resultado en la hoja *Historial* de `casos_de_prueba_NeuroClerk.xlsx` y en el mensaje del commit.
 - **Respuestas:** el modelo responde solo con el contexto y cita cada afirmación, con temperatura 0.1. Lo más delicado son las dosis, que no deben inventarse nunca. Los casos de abstención de las pruebas cubren parte de esto.
 - **Datos de pacientes:** nunca por Gemini ni Groq, solo con `PROVEEDOR = "ollama"`.
+- **`evaluaciones/`:** contiene texto de los PDFs, así que no se sube a Git.
 - **`datos/`:** es la fuente de verdad y todo lo que contiene puede citarse como bibliografía. Las notas y los casos ficticios van en `pruebas/`. No subir los PDFs a Git, por derechos de autor.
 - **Nombres de PDF:** claros y sin tildes ni eñes (`FT_Litio.pdf`), porque el modelo los cita y las tildes se desconfiguran entre Windows y Colab. Cada documento nuevo se registra en `fuentes.csv`.
 - **Dependencias:** al instalar una librería, regenerar `requirements-lock.txt` con `pip freeze` y volver a poner al principio la línea `--extra-index-url https://download.pytorch.org/whl/cpu`; sin ella falla la instalación de `torch==...+cpu`.

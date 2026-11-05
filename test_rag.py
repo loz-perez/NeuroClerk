@@ -7,6 +7,7 @@
 
 import pytest
 
+from evaluar_ragas import contextos_de, metricas_de, pendientes, resumir
 from probar_rag import dosis_sin_respaldo, extraer_dosis, respuesta_ok
 from rag import _parecido, dividir_en_chunks, tabla_a_unidades
 
@@ -210,3 +211,46 @@ def test_dosis_sin_respaldo_acepta_la_cifra_que_ya_estaba_en_la_pregunta():
     respuesta = "No: el máximo es 200 mg, no 500 mg."
     assert dosis_sin_respaldo(respuesta, fragmentos, "¿Es de 500 mg?") == set()
     assert dosis_sin_respaldo(respuesta, fragmentos) == {"500 mg"}
+
+
+# ---------------------------------------------------------------
+# evaluar_ragas.py: no necesita Ragas instalado para estas funciones
+# ---------------------------------------------------------------
+def caso_ragas(tipo="fuente", pregunta="¿P?", respuesta="R"):
+    return {"tipo": tipo, "pregunta": pregunta, "respuesta": respuesta,
+            "fragmentos": [{"archivo": "FT_Litio.pdf", "pagina": 3, "texto": "Texto"}]}
+
+
+def test_contexto_de_ragas_lleva_archivo_y_pagina_como_el_del_modelo():
+    assert contextos_de(caso_ragas()) == ["[FT_Litio.pdf, página 3] Texto"]
+
+
+def test_abstencion_y_dosis_ausente_no_miden_relevancia():
+    assert metricas_de(caso_ragas("abstencion")) == ["fidelidad"]
+    assert metricas_de(caso_ragas("dosis_ausente")) == ["fidelidad"]
+    assert metricas_de(caso_ragas("dosis")) == ["fidelidad", "relevancia"]
+
+
+def test_pendientes_retoma_donde_quedo():
+    caso = caso_ragas()
+    resultados = {"¿P?": {"respuesta": "R", "metricas": {"fidelidad": 0.5}}}
+    assert pendientes([caso], resultados) == [(caso, "relevancia")]
+
+
+def test_pendientes_reevalua_si_la_respuesta_cambio():
+    caso = caso_ragas(respuesta="Nueva")
+    resultados = {"¿P?": {"respuesta": "R", "metricas": {"fidelidad": 0.5, "relevancia": 0.5}}}
+    assert pendientes([caso], resultados) == [(caso, "fidelidad"), (caso, "relevancia")]
+
+
+def test_resumen_promedia_por_tipo_y_cuenta_los_sin_valor():
+    casos = [caso_ragas(pregunta="A"), caso_ragas(pregunta="B"), caso_ragas(pregunta="C")]
+    resultados = {"A": {"respuesta": "R", "metricas": {"fidelidad": 1.0}},
+                  "B": {"respuesta": "R", "metricas": {"fidelidad": 0.5}},
+                  "C": {"respuesta": "R", "metricas": {"fidelidad": None}}}
+    assert resumir(casos, resultados)[("fuente", "fidelidad")] == {"promedio": 0.75, "casos": 2, "sin_valor": 1}
+
+
+def test_resumen_ignora_resultados_de_una_respuesta_anterior():
+    resultados = {"¿P?": {"respuesta": "Vieja", "metricas": {"fidelidad": 1.0}}}
+    assert resumir([caso_ragas()], resultados) == {}

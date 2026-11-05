@@ -44,6 +44,9 @@ NeuroClerk/
 ├── probar_rag.py          # pruebas automáticas de búsqueda y respuesta
 ├── probar_tablas.py       # prueba anterior; sus 7 casos ya están en probar_rag.py
 ├── test_rag.py            # pruebas unitarias de las funciones puras (pytest)
+├── evaluar_ragas.py       # mide con Ragas las respuestas exportadas (entorno aparte)
+├── .venv-ragas/           # entorno de Ragas (no se sube a Git)
+├── evaluaciones/          # respuestas exportadas y resultados (no se suben a Git)
 ├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
 ├── descargar_fichas.py    # descarga las fichas técnicas de CIMA
 ├── revisar_datos.py       # revisa la carpeta datos/ antes de indexar
@@ -51,6 +54,7 @@ NeuroClerk/
 ├── DATOS.md               # qué documentos poner en datos/ y dónde conseguirlos
 ├── requirements.txt       # librerías principales
 ├── requirements-lock.txt  # versiones exactas de todo el entorno
+├── requirements-ragas.txt # librerías de .venv-ragas
 ├── .gitignore
 ├── CLAUDE.md              # guía para trabajar en el proyecto con Claude Code
 ├── HOJA_DE_RUTA.md
@@ -297,6 +301,29 @@ Resultados:
 La medición anterior a la última dio 13/17 en respuesta. El caso que se sumó es el 17, porque se agregaron palabras clave a la prueba, no porque mejorara el sistema. Siguen fallando los casos 12 (CIE-11), 13 (mhGAP) y 16 (PHQ-9).
 
 El detalle de cada caso y la evolución entre versiones están en la hoja de cálculo. Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas, anota el resultado en la hoja *Historial* y en el mensaje del commit.
+
+### Evaluación con Ragas
+
+`evaluar_ragas.py` complementa a `probar_rag.py` con dos medidas de [Ragas](https://docs.ragas.io/) que no necesitan una respuesta de referencia:
+
+- **Fidelidad:** qué proporción de lo que afirma la respuesta está respaldada por los fragmentos.
+- **Relevancia:** cuánto contesta la respuesta lo que se preguntó. Sirve para comparar casos y versiones, no como valor absoluto: en una prueba, una respuesta sin ninguna relación con la pregunta sacó 0.49. No se mide en los casos en los que lo correcto es no responder.
+
+Ragas corre en un entorno aparte, porque exige LangChain y una versión de `openai` más vieja que la de `rag.py`. La aplicación no lo usa ni lo importa.
+
+```powershell
+py -3.12 -m venv .venv-ragas
+.venv-ragas\Scripts\python.exe -m pip install -r requirements-ragas.txt
+
+.venv\Scripts\python.exe probar_rag.py --llm --exportar   # guarda las respuestas en evaluaciones/ (28 peticiones)
+.venv-ragas\Scripts\python.exe evaluar_ragas.py           # las evalúa (gasta cupo)
+.venv-ragas\Scripts\python.exe evaluar_ragas.py --limite 5   # solo 5 evaluaciones nuevas
+.venv-ragas\Scripts\python.exe evaluar_ragas.py --resumen    # muestra lo ya evaluado, sin pedir nada
+```
+
+Cada resultado se guarda al obtenerlo: si se agota el cupo, volver a correrlo sigue donde quedó. Una respuesta que cambió se vuelve a evaluar. `evaluaciones/` no se sube a Git porque contiene texto de los PDFs.
+
+Ragas usa un modelo para juzgar, así que sus puntajes pueden variar entre ejecuciones y equivocarse: un puntaje bajo es una señal para revisar la respuesta a mano. No reemplaza el chequeo de dosis de `probar_rag.py`, que es exacto. Como envía preguntas, fragmentos y respuestas a Gemini, no debe usarse con datos de pacientes.
 
 ## Documentos de prueba
 

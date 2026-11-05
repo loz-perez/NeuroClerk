@@ -1,4 +1,6 @@
 .venv/
+.venv-ragas/
+evaluaciones/
 __pycache__/
 datos/
 chroma_db/

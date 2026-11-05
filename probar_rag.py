@@ -9,6 +9,9 @@
 #   python probar_rag.py --llm --pausa 15
 #                                      -> espera 15 segundos entre preguntas (por defecto 12),
 #                                         para no chocar con el límite por minuto del proveedor
+#   python probar_rag.py --llm --exportar
+#                                      -> además guarda preguntas, fragmentos y respuestas en
+#                                         evaluaciones/respuestas.json, para evaluar_ragas.py
 #   python probar_rag.py --buscar PALABRA [ARCHIVO]
 #                                      -> muestra los fragmentos que contienen esa palabra
 #                                         (en todos los documentos, o solo en ARCHIVO);
@@ -23,11 +26,13 @@
 #
 # Usa la misma base de ChromaDB que rag.py: si los PDFs ya están indexados, arranca rápido.
 
+import json
 import os
 import re
 import sys
 import time
 import unicodedata
+from pathlib import Path
 
 # El modelo se elige ANTES de importar rag.py. Por defecto, uno con cupo para toda la prueba.
 MODELO_PRUEBAS = "gemini-3.5-flash-lite"
@@ -39,6 +44,7 @@ else:
 import rag
 
 LIBRO = "Interacciones_Farmacologicas_SEFH.pdf"
+ARCHIVO_EXPORTACION = Path("evaluaciones/respuestas.json")   # fuera de Git: contiene texto de los PDFs
 
 # Tipos de caso:
 #   "tabla"      -> la respuesta está en una tabla del libro de interacciones
@@ -239,6 +245,24 @@ def respuesta_ok(respuesta, caso):
     return False, f"no menciona ninguna de: {', '.join(caso['claves'])}"
 
 
+def registro_de(caso, fragmentos, respuesta):
+    """Lo que evaluar_ragas.py necesita de un caso: el mismo contexto que recibió el modelo."""
+    return {
+        "tipo": caso["tipo"],
+        "grupo": caso["grupo"],
+        "pregunta": caso["pregunta"],
+        "respuesta": respuesta,
+        "fragmentos": [{"archivo": f["archivo"], "pagina": f["pagina"], "texto": f["texto"]}
+                       for f in fragmentos],
+    }
+
+
+def exportar(registros):
+    """Guarda lo exportado hasta ahora: si se agota el cupo, no se pierden las respuestas obtenidas."""
+    ARCHIVO_EXPORTACION.parent.mkdir(exist_ok=True)
+    ARCHIVO_EXPORTACION.write_text(json.dumps(registros, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def textos_de(archivos):
     """Todos los fragmentos indexados de esos archivos, normalizados."""
     r = rag.coleccion.get(where={"archivo": {"$in": list(archivos)}}, include=["documents"])
@@ -337,6 +361,8 @@ def ranking(pregunta, archivo):
 
 
 def main():
+    if "--exportar" in sys.argv and "--llm" not in sys.argv:
+        raise SystemExit("--exportar guarda las respuestas del modelo: úsalo junto con --llm.")
     if "--llm" in sys.argv:
         rag.comprobar_clave()
     rag.preparar()   # abre ChromaDB e indexa lo que falte
@@ -364,6 +390,7 @@ def main():
            "fuente_dosis": [0, 0], "dosis": [0, 0], "respaldo": [0, 0]}
     sin_respaldo_por_caso = []
     errores = 0
+    registros = []
 
     for n, caso in enumerate(CASOS, start=1):
         print(f"\n[{n}] {caso['grupo']}: {caso['pregunta']}")
@@ -415,6 +442,9 @@ def main():
                           "diario. Sigo solo con la búsqueda.")
                 continue
             errores_seguidos = 0
+            if "--exportar" in sys.argv:
+                registros.append(registro_de(caso, fragmentos, respuesta))
+                exportar(registros)
             clave = {"abstencion": "abstencion", "dosis": "dosis",
                      "dosis_ausente": "dosis"}.get(caso["tipo"], "respuesta")
             ok, detalle = respuesta_ok(respuesta, caso)

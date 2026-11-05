@@ -1,0 +1,5 @@
+# Entorno aparte para evaluar_ragas.py (.venv-ragas): no instalar en .venv.
+# Ragas exige LangChain y baja openai a 1.x, y rag.py usa openai 3.x.
+ragas==0.4.3
+# Ragas 0.4.3 importa langchain_community.chat_models.vertexai, que ya no existe desde la 0.4
+langchain-community==0.3.31

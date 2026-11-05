@@ -59,7 +59,7 @@ Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (ca
 **Relación entre `rag.py` y `probar_rag.py`.** Cambiar uno de estos puntos puede romper las pruebas sin que se note a simple vista:
 
 - `probar_rag.py` usa `rag.preparar`, `rag.comprobar_clave`, `rag.coleccion`, `rag.recuperar`, `rag.responder`, `rag.archivos`, `rag.CUPO`, `rag.modelo_emb`, `rag.MARGEN`, `rag.K_MIN` y `rag.PREFIJO_PREGUNTA`.
-- Los avisos del proveedor (límite alcanzado, servidor caído) se devuelven como texto que empieza con `[`, y las pruebas los detectan así para contarlos como errores y no como fallos.
+- Los avisos del proveedor (límite alcanzado, servidor caído, respuesta incompleta) se devuelven como texto que empieza con `[`, y las pruebas los detectan así para contarlos como errores y no como fallos.
 - Los casos de tabla comparan la página y el comienzo del texto del fragmento con el título esperado, así que cambiar el formato de los fragmentos de tabla afecta esos casos.
 - `probar_rag.py` fija `NEUROCLERK_MODELO` antes de importar `rag` y usa por defecto `gemini-3.5-flash-lite`, aunque `PROVEEDOR` sea otro. Con Groq u Ollama hay que pasar `--modelo`.
 

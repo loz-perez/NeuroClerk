@@ -59,7 +59,7 @@ Hecho:
 - Prompt con reglas: citar después de cada afirmación, no agregar nada fuera del contexto e incluir todas las fuentes relevantes; temperatura 0.1.
 - Tablas extraídas con pdfplumber: un fragmento por fila, uno por categoría (*Sustratos*, *Inhibidores*, *Inductores*) y título heredado en las continuaciones.
 - Limpieza del texto escaneado (palabras cortadas con guion).
-- Modelo en la nube (Gemini o Groq) con streaming y reintentos automáticos ante errores pasajeros y límites de uso.
+- Modelo en la nube (Gemini o Groq) sin streaming, porque el de Gemini a veces se cierra a mitad de respuesta y sin indicar el motivo, con reintentos automáticos ante errores pasajeros, límites de uso y respuestas incompletas. Una respuesta sin confirmación de que terminó no se muestra.
 - Indexación en Colab con GPU, con huella por contenido para reutilizar la base en la PC.
 - Pruebas automáticas con `probar_rag.py`: 28 casos sobre tablas de interacciones, fichas técnicas, criterios del DSM-5-TR, la CIE-11, la guía mhGAP, el Formulario, las escalas, un caso clínico, dos preguntas en las que debe abstenerse y 9 casos de dosis.
   - Antes de medir, `--verificar` comprueba que cada palabra clave esté en su fuente.
@@ -86,7 +86,6 @@ Falta:
   - **Escitalopram en mayores de 65 (modelo):** la dosis llega al contexto, pero responde que no está.
   - **Lamotrigina con valproato (búsqueda):** la pauta de 12,5 mg/día no llega al contexto. El modelo se abstiene y no da la dosis equivocada.
 - Documentos en inglés: con preguntas en español casi no llegan al contexto. Dos documentos sobre zolpidem que se probaron y se quitaron no aparecieron en ninguno de los 28 casos, y es posible que a la tabla de Flockhart le pase lo mismo.
-- Respuestas cortadas: en una ejecución, el caso del litio respondió solo "Bas" y se contó como fallo. La prueba debería contarlo como error, y conviene revisar si `generar()` detecta el corte.
 - Revisar si el límite por página corta listas largas: en la tabla de inhibidores del CYP2D6, la continuación queda afuera.
 - Agregar al prompt la regla de no dar dosis que no estén textuales en un fragmento citado, y medirla con las pruebas.
 - Un flujo de consulta tipo *"Paciente toma fluoxetina, ¿puedo añadir tramadol?"* con una advertencia destacada. Hoy responde en texto libre.

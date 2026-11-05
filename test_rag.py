@@ -5,8 +5,13 @@
 # No necesitan el modelo de embeddings, ChromaDB, los PDFs de datos/ ni claves, y tardan
 # menos de un segundo. La calidad de la búsqueda y de las respuestas se mide con probar_rag.py.
 
+import sys
+import time
+from types import SimpleNamespace
+
 import pytest
 
+import rag
 from evaluar_ragas import contextos_de, metricas_de, pendientes, resumir
 from probar_rag import dosis_sin_respaldo, extraer_dosis, respuesta_ok
 from rag import _parecido, dividir_en_chunks, tabla_a_unidades
@@ -254,3 +259,83 @@ def test_resumen_promedia_por_tipo_y_cuenta_los_sin_valor():
 def test_resumen_ignora_resultados_de_una_respuesta_anterior():
     resultados = {"¿P?": {"respuesta": "Vieja", "metricas": {"fidelidad": 1.0}}}
     assert resumir([caso_ragas()], resultados) == {}
+
+
+# generar: una respuesta sin confirmación de que terminó no se entrega
+# ---------------------------------------------------------------
+class ClienteFalso:
+    """Imita al cliente de OpenAI: devuelve las respuestas indicadas, una por llamada."""
+
+    def __init__(self, *respuestas):
+        self.pendientes = list(respuestas)
+        self.llamadas = 0
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.crear))
+
+    def crear(self, **parametros):
+        assert "stream" not in parametros
+        self.llamadas += 1
+        texto, motivo = self.pendientes.pop(0)
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason=motivo,
+                                                        message=SimpleNamespace(content=texto))])
+
+
+@pytest.fixture
+def nube(monkeypatch):
+    monkeypatch.setattr(rag, "PROVEEDOR", "gemini")
+    monkeypatch.setattr(time, "sleep", lambda segundos: None)
+
+    def usar(*respuestas):
+        cliente = ClienteFalso(*respuestas)
+        monkeypatch.setattr(rag, "_cliente", cliente)
+        return cliente
+    return usar
+
+
+def test_generar_entrega_la_respuesta_que_termino_bien(nube):
+    cliente = nube(("Completa", "stop"))
+    assert "".join(rag.generar("p")) == "Completa"
+    assert cliente.llamadas == 1
+
+
+def test_generar_reintenta_si_no_se_indica_el_motivo_de_cierre(nube):
+    cliente = nube(("Según los", None), ("Completa", "stop"))
+    assert "".join(rag.generar("p")) == "Completa"
+    assert cliente.llamadas == 2
+
+
+def test_generar_avisa_y_no_entrega_el_trozo_si_nunca_termina(nube):
+    cliente = nube(*[("Según los", None)] * 4)
+    respuesta = "".join(rag.generar("p"))
+    assert respuesta.startswith("[")   # así las pruebas lo cuentan como error y no como fallo
+    assert "Según los" not in respuesta
+    assert cliente.llamadas == 4
+
+
+def test_generar_no_reintenta_si_se_alcanzo_el_limite_de_tokens(nube):
+    cliente = nube(("Lista larga", "length"))
+    respuesta = "".join(rag.generar("p"))
+    assert respuesta.startswith("[") and "length" in respuesta
+    assert "Lista larga" not in respuesta
+    assert cliente.llamadas == 1
+
+
+def test_generar_reintenta_si_termina_sin_texto(nube):
+    cliente = nube((None, "stop"), ("Completa", "stop"))
+    assert "".join(rag.generar("p")) == "Completa"
+    assert cliente.llamadas == 2
+
+
+@pytest.mark.parametrize("motivo, esperado", [
+    ("stop", "Hola mundo"),
+    ("length", "["),
+    (None, "["),
+])
+def test_generar_con_ollama_revisa_el_motivo_de_cierre(monkeypatch, motivo, esperado):
+    ChatResponse = pytest.importorskip("ollama").ChatResponse   # no está en requirements.txt
+    # Tipos reales de la librería: en los trozos intermedios, leer ["done_reason"] lanza KeyError
+    final = {"done_reason": motivo} if motivo else {}
+    trozos = [ChatResponse(message={"role": "assistant", "content": "Hola "}),
+              ChatResponse(message={"role": "assistant", "content": "mundo"}, **final)]
+    monkeypatch.setitem(sys.modules, "ollama", SimpleNamespace(chat=lambda **parametros: iter(trozos)))
+    monkeypatch.setattr(rag, "PROVEEDOR", "ollama")
+    assert "".join(rag.generar("p")).startswith(esperado)

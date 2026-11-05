@@ -30,7 +30,7 @@ from sentence_transformers import SentenceTransformer
 # no mandes datos de pacientes por ahí.
 PROVEEDOR = "gemini"
 MODELOS = {
-    "gemini": "gemini-3.8-flash",
+    "gemini": "gemini-3.5-flash-lite",
     "groq": "openai/gpt-oss-120b",
     "ollama": "qwen3:8b",
 }

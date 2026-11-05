@@ -1,15 +1,15 @@
 # Hoja de ruta de NeuroClerk
 
-*Actualizada el 27 de octubre de 2026.*
+*Actualizada el 5 de noviembre de 2026.*
 
-NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 59 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 19 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 13 de 17, más 2 de 2 abstenciones. Para cerrar la fase 2 faltan tres fallos de búsqueda, la regla de seguridad sobre dosis y el flujo de advertencias; después vienen el módulo de notas clínicas y la interfaz web.
+NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 19 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 14 de 17, más 2 de 2 abstenciones. Para cerrar la fase 2 faltan tres casos que fallan (dos de búsqueda y uno del modelo), la regla de seguridad sobre dosis y el flujo de advertencias; después vienen el módulo de notas clínicas y la interfaz web.
 
 ## De un vistazo
 
 | Fase | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Entorno y fundamentos de RAG | ✅ Completada |
-| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: respuestas 13/17, faltan la regla de dosis y las advertencias |
+| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: respuestas 14/17, faltan la regla de dosis y las advertencias |
 | 3 | Módulo de documentación clínica (notas SOAP) | ⚪ Pendiente |
 | 4 | Interfaz y pruebas con usuarios | ⚪ Pendiente |
 
@@ -22,13 +22,13 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 | Componente | Elección | Por qué |
 | --- | --- | --- |
 | Lenguaje | Python 3.12 | Las versiones más nuevas todavía no tienen PyTorch disponible |
-| Modelo de lenguaje | `gemini-3.8-flash` (nube); `openai/gpt-oss-120b` en Groq y `qwen3:8b` en Ollama como alternativas | Gemini responde en segundos y usa bien las tablas; Ollama queda para datos que no deben salir de la PC |
+| Modelo de lenguaje | `gemini-3.5-flash-lite` (nube); `openai/gpt-oss-120b` en Groq y `qwen3:8b` en Ollama como alternativas | Gemini responde en segundos y usa bien las tablas; Ollama queda para datos que no deben salir de la PC |
 | Modelo para las pruebas | `gemini-3.5-flash-lite` | Su cupo gratuito alcanza para correr las 19 pruebas seguidas |
 | Framework RAG | Código propio en `rag.py` | Para aprender cómo funciona cada paso; un framework queda para más adelante |
 | Embeddings | `intfloat/multilingual-e5-base` | Lee unas 300 palabras por fragmento; MiniLM solo leía unas 80 |
 | Base vectorial | ChromaDB 1.5.9, guardada en disco | Evita recalcular los vectores en cada ejecución |
 | Lectura de PDFs | pypdf (texto) y pdfplumber (tablas por filas y categorías) | pypdf convierte las tablas en listas sin título que la búsqueda no encuentra |
-| Indexación | Local, o en Google Colab con GPU | Indexar ~3.200 páginas en CPU tarda horas |
+| Indexación | Local, o en Google Colab con GPU | Indexar ~3.300 páginas en CPU tarda horas |
 | Pruebas | `probar_rag.py` y la planilla `casos_de_prueba_NeuroClerk.xlsx` | Medir cada cambio con los mismos casos y guardar el historial |
 | Interfaz | Terminal; Streamlit en la fase 4 | Para probar sin depender de una interfaz |
 | Control de versiones | Git y GitHub (repositorio privado), una rama por función | Para volver a una versión que funciona si algo se rompe |
@@ -40,7 +40,7 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 El entorno de desarrollo y la base de conocimiento, con documentos reales de referencia.
 
 - VS Code, entorno virtual con Python 3.12, Git y GitHub.
-- Base de conocimiento de 59 PDFs (~3.200 páginas, ~13.400 fragmentos): 51 fichas técnicas de CIMA, el libro de interacciones de la SEFH, la tabla CYP450 de Flockhart, el DSM-5, la guía de referencia de la CIE-11, la guía mhGAP, el Formulario Terapéutico del MSP y las escalas PHQ-9, GAD-7, YMRS y PANSS.
+- Base de conocimiento de 61 PDFs (~3.300 páginas, ~13.700 fragmentos): 51 fichas técnicas de CIMA, el libro de interacciones de la SEFH, la tabla CYP450 de Flockhart, el DSM-5-TR, la guía de referencia de la CIE-11, la guía mhGAP, el Formulario Terapéutico del MSP y las escalas PHQ-9, GAD-7, YMRS y PANSS.
 - Herramientas para mantenerla: `descargar_fichas.py` (descarga automática desde CIMA), `revisar_datos.py` (control de la carpeta antes de indexar) y `fuentes.csv` (registro de cada documento).
 
 ### Fase 2: Consulta farmacológica con RAG — casi completa
@@ -60,7 +60,7 @@ Hecho:
 - Limpieza del texto escaneado (palabras cortadas con guion).
 - Modelo en la nube (Gemini o Groq) con streaming y reintentos automáticos ante errores pasajeros y límites de uso.
 - Indexación en Colab con GPU, con huella por contenido para reutilizar la base en la PC.
-- Pruebas automáticas con `probar_rag.py`: 19 casos sobre tablas de interacciones, fichas técnicas, criterios del DSM-5, la CIE-11, la guía mhGAP, el Formulario, las escalas, un caso clínico y dos preguntas en las que debe abstenerse.
+- Pruebas automáticas con `probar_rag.py`: 19 casos sobre tablas de interacciones, fichas técnicas, criterios del DSM-5-TR, la CIE-11, la guía mhGAP, el Formulario, las escalas, un caso clínico y dos preguntas en las que debe abstenerse.
   - Antes de medir, `--verificar` comprueba que cada palabra clave esté en su fuente.
   - Para diagnosticar un fallo, `--buscar` y `--ranking` muestran qué fragmentos existen y cuál de los filtros los deja afuera.
 
@@ -71,13 +71,16 @@ Evolución de las pruebas:
 | Tablas por filas y categorías, cupo proporcional | 7/7 | 16/17 | 12/17 | 2/2 |
 | Límite de 2 fragmentos por página | 7/7 | 16/17 | 14/17 | 2/2 |
 | Filtro de casi duplicados y caso de la CIE-11 rehecho | 7/7 | 17/17 | 13/17 | 2/2 |
+| Tope de 12 fragmentos, caso de la CIE-11 reformulado, claves ampliadas en el caso clínico y 2 fichas más | 7/7 | 17/17 | 14/17 | 2/2 |
+
+El caso que se sumó en la última fila es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba.
 
 Falta:
 
-- Resolver los tres fallos de búsqueda que quedan:
-  - **mhGAP:** la página con los antidepresivos recomendados queda en el puesto 11. El tope ya subió a 12; falta medirlo.
-  - **CIE-11:** llega la tabla de equivalencias con la CIE-10, pero no la fila de la esquizofrenia. La pregunta ya está reformulada sin el código; falta medirlo.
-  - **PHQ-9:** llega un solo fragmento del cuestionario, sin el puntaje máximo.
+- Resolver los tres casos que siguen fallando:
+  - **CIE-11 (búsqueda):** la página 504, con la equivalencia de la esquizofrenia, no llega al contexto, ni siquiera con la pregunta reformulada.
+  - **PHQ-9 (búsqueda):** llega solo la página 1 del cuestionario; el 27 aparece únicamente en la página 2 ("20-27 Severe").
+  - **mhGAP (modelo):** con el tope de 12 ya llega el Cuadro 1 de antidepresivos (página 37, puesto 5), pero el modelo responde que el contexto no alcanza.
 - Revisar si el límite por página corta listas largas: en la tabla de inhibidores del CYP2D6, la continuación queda afuera.
 - Agregar al prompt la regla de no dar dosis que no estén textuales en un fragmento citado, y medirla con las pruebas.
 - Un flujo de consulta tipo *"Paciente toma fluoxetina, ¿puedo añadir tramadol?"* con una advertencia destacada. Hoy responde en texto libre.
@@ -109,18 +112,18 @@ Las citas por afirmación y las pruebas automáticas cubren buena parte de la re
 | Humano en el bucle | Parcial | Muestra los fragmentos usados para verificar cada dato | La revisión y firma de notas llega con la fase 3 |
 | Datos sintéticos | Pendiente | Todavía no se usan datos de pacientes | Escribir los casos ficticios para las fases 2 y 3 |
 | Privacidad | Parcial | La búsqueda es local; los PDFs, la base vectorial y las claves no se suben a Git, y el repositorio es privado; Ollama permite trabajar sin enviar nada fuera | Con Gemini o Groq, la pregunta y los fragmentos salen a la nube: datos de pacientes, solo con Ollama |
-| Derechos de autor | Parcial | Los documentos con licencia (DSM-5, PANSS) quedan solo en la PC | Confirmar la licencia de la YMRS antes de cualquier uso compartido |
+| Derechos de autor | Parcial | Los documentos con licencia (DSM-5-TR, PANSS) quedan solo en la PC | Confirmar la licencia de la YMRS antes de cualquier uso compartido |
 | Aviso de uso | Parcial | Está en el README | Mostrarlo en la interfaz (fase 4) |
 
 ## Próximos pasos
 
-Primero se cierra la fase 2 con los fallos de búsqueda y las reglas de seguridad, y después se empieza la documentación clínica.
+Primero se cierra la fase 2 con los casos que fallan y las reglas de seguridad, y después se empieza la documentación clínica.
 
 - [x] Un fragmento por fila en las tablas con columnas.
 - [x] Pruebas de referencia sobre todos los tipos de documento: 19 casos en `probar_rag.py`, con la planilla de resultados.
 - [x] Límite de fragmentos por página y filtro de casi duplicados.
-- [ ] Medir el tope de 12 fragmentos y la pregunta nueva de la CIE-11.
-- [ ] Resolver el caso del PHQ-9.
+- [x] Medir el tope de 12 fragmentos y la pregunta nueva de la CIE-11.
+- [ ] Resolver los casos de la CIE-11, el PHQ-9 y la mhGAP.
 - [ ] Agregar al prompt la regla de no dar dosis que no estén textuales en un fragmento citado.
 - [ ] Flujo de advertencias para consultas de combinación de fármacos.
 - [ ] Escribir los casos clínicos ficticios: pacientes con su medicación, para la consulta farmacológica, y notas en texto libre, para el SOAP.

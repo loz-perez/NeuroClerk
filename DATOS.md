@@ -1,6 +1,6 @@
 # Documentos para la carpeta `datos`
 
-*Actualizado el 26 de octubre de 2026.*
+*Actualizado el 5 de noviembre de 2026.*
 
 Para que NeuroClerk responda mejor no hacen falta más documentos, sino los correctos: fuentes oficiales, actuales, con texto seleccionable y sin contradicciones entre sí. Lo primero son las fichas técnicas de los psicofármacos más usados, que es lo que más mejora las respuestas con menos esfuerzo.
 
@@ -15,12 +15,12 @@ Son la fuente más confiable para indicaciones, dosis, interacciones y advertenc
 | Antidepresivos ISRS | fluoxetina, sertralina ✅, paroxetina, citalopram, escitalopram, fluvoxamina |
 | Otros antidepresivos | venlafaxina, duloxetina, mirtazapina, bupropión, trazodona, vortioxetina, agomelatina |
 | Tricíclicos e IMAO | amitriptilina, clomipramina, moclobemida |
-| Antipsicóticos | haloperidol, risperidona, paliperidona, olanzapina, quetiapina ✅, aripiprazol, clozapina ✅, ziprasidona, amisulprida, lurasidona, cariprazina |
+| Antipsicóticos | haloperidol, risperidona, paliperidona, olanzapina, quetiapina, aripiprazol, clozapina ✅, ziprasidona, amisulprida, lurasidona, cariprazina |
 | Estabilizadores del ánimo | litio ✅, valproato, carbamazepina, oxcarbazepina, lamotrigina |
-| Ansiolíticos e hipnóticos | alprazolam, lorazepam, clonazepam, diazepam, zolpidem |
+| Ansiolíticos e hipnóticos | alprazolam ✅, lorazepam, clonazepam, diazepam, zolpidem |
 | TDAH | metilfenidato, atomoxetina, lisdexanfetamina |
 | Adicciones | naltrexona, disulfiram, buprenorfina, metadona |
-| No psiquiátricos que interaccionan a menudo | tramadol, warfarina, IECA (enalapril), AINE (ibuprofeno), claritromicina, linezolid, ciprofloxacino |
+| No psiquiátricos que interaccionan a menudo | tramadol, warfarina, IECA (enalapril ✅), AINE (ibuprofeno), claritromicina, linezolid, ciprofloxacino |
 
 La última fila sirve para que el sistema encuentre la interacción desde los dos lados.
 
@@ -33,11 +33,11 @@ Nombra los archivos de forma clara (`FT_Litio.pdf`, no `FT_63845.pdf`), porque e
 | Documento | Para qué sirve | Estado |
 | --- | --- | --- |
 | *Introducción a las interacciones farmacológicas* (SEFH) | Mecanismos de interacción y tablas de fármacos de riesgo | ✅ En uso; sus tablas funcionan bien |
-| Tabla de enzimas CYP450 (*Flockhart Table*, Universidad de Indiana) | Referencia clásica de sustratos, inhibidores e inductores | Pendiente; revisar sus condiciones de uso |
-| DSM-5 | Criterios diagnósticos | ✅ En uso; el DSM-5-TR (2022) es más actual. Ninguno se puede compartir |
-| CIE-11 (OMS), guía clínica CDDR | Criterios diagnósticos oficiales y gratuitos, en PDF | Pendiente; comprobar si hay versión en español |
+| Tabla de enzimas CYP450 (*Flockhart Table*, Universidad de Indiana) | Referencia clásica de sustratos, inhibidores e inductores | ✅ En uso; falta revisar sus condiciones de uso |
+| DSM-5-TR | Criterios diagnósticos | ✅ En uso. No se puede compartir |
+| CIE-11 (OMS), guía de referencia | Clasificación diagnóstica oficial y gratuita, en PDF | ✅ En uso (edición 2025-01) |
 
-Si la CIE-11 solo está en inglés, igual sirve: `multilingual-e5-base` funciona bien con documentos en inglés.
+Los documentos en inglés también sirven: `multilingual-e5-base` funciona bien con ellos.
 
 ## Guías clínicas y escalas
 
@@ -63,6 +63,6 @@ Las guías responden preguntas de "qué hacer", no solo de "qué es". Las escala
 
 ## Para que escale bien
 
-1. **Llevar un registro de fuentes.** Un archivo `fuentes.csv`, fuera de `datos`, con el nombre, la fuente, la URL y la fecha de descarga de cada documento. Las fichas técnicas se actualizan, y así se sabe cuándo renovarlas.
-2. **Con muchas fichas, buscar por tipo de documento.** Hoy `rag.py` busca 3 candidatos por archivo; con 50 fichas son 150 candidatos por pregunta, más lento y con más ruido. Conviene buscar por tipo (ficha, guía, diagnóstico) usando los metadatos de ChromaDB.
-3. **Volver a correr `probar_tablas.py` después de cada tanda de documentos nuevos**, para confirmar que la búsqueda sigue funcionando bien.
+1. **Mantener el registro de fuentes.** `fuentes.csv`, fuera de `datos`, guarda el nombre, la fuente, la URL y la fecha de descarga de cada documento. Las fichas técnicas se actualizan, y así se sabe cuándo renovarlas.
+2. **Con muchas fichas, buscar por tipo de documento.** Hoy `rag.py` busca de 3 a 15 candidatos por archivo; con 61 documentos son al menos 183 candidatos por pregunta, más lento y con más ruido. Conviene buscar por tipo (ficha, guía, diagnóstico) usando los metadatos de ChromaDB.
+3. **Volver a correr `probar_rag.py` después de cada tanda de documentos nuevos**, para confirmar que la búsqueda sigue funcionando bien.

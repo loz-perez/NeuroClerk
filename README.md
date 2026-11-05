@@ -1,8 +1,8 @@
 # NeuroClerk
 
-NeuroClerk es un asistente para psiquiatría que responde consultas sobre interacciones farmacológicas y, en una próxima versión, ayudará a estructurar notas de evolución. Usa RAG: responde solo con la información de documentos de referencia, como el DSM-5 o fichas técnicas, y cita el archivo y la página de cada dato, para que cualquier respuesta se pueda verificar en la fuente. La búsqueda funciona siempre en equipos propios; la respuesta la puede redactar un modelo local o uno gratuito en la nube.
+NeuroClerk es un asistente para psiquiatría que responde consultas sobre interacciones farmacológicas y, en una próxima versión, ayudará a estructurar notas de evolución. Usa RAG: responde solo con la información de documentos de referencia, como el DSM-5-TR o fichas técnicas, y cita el archivo y la página de cada dato, para que cualquier respuesta se pueda verificar en la fuente. La búsqueda funciona siempre en equipos propios; la respuesta la puede redactar un modelo local o uno gratuito en la nube.
 
-El estado de cada fase y los próximos pasos están en [HOJA_DE_RUTA.md](HOJA_DE_RUTA.md). 
+El estado de cada fase y los próximos pasos están en [HOJA_DE_RUTA.md](HOJA_DE_RUTA.md).
 
 Qué documentos usar y dónde conseguirlos, en [DATOS.md](DATOS.md).
 
@@ -35,13 +35,14 @@ flowchart LR
 
 ## Estructura del proyecto
 
-```
+```text
 NeuroClerk/
 ├── .venv/                 # entorno virtual (no se sube a Git)
 ├── datos/                 # tus PDFs (no se suben a Git)
 ├── chroma_db/             # vectores guardados (no se sube a Git)
 ├── rag.py                 # el programa completo
 ├── probar_rag.py          # pruebas automáticas de búsqueda y respuesta
+├── probar_tablas.py       # prueba anterior; sus 7 casos ya están en probar_rag.py
 ├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
 ├── descargar_fichas.py    # descarga las fichas técnicas de CIMA
 ├── revisar_datos.py       # revisa la carpeta datos/ antes de indexar
@@ -50,6 +51,7 @@ NeuroClerk/
 ├── requirements.txt       # librerías principales
 ├── requirements-lock.txt  # versiones exactas de todo el entorno
 ├── .gitignore
+├── CLAUDE.md              # guía para trabajar en el proyecto con Claude Code
 ├── HOJA_DE_RUTA.md
 └── README.md
 ```
@@ -98,11 +100,14 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
 
 - `requirements.txt` tiene solo las librerías principales; `requirements-lock.txt`, las versiones exactas de todo el entorno.
 - **Cada vez que instales una librería nueva**, regenera el lock en ese momento:
+
   ```powershell
   pip freeze > requirements-lock.txt
   ```
+
 - `pip freeze` no escribe la dirección de PyTorch CPU. Después de regenerarlo, agrega esta línea **al principio** del archivo; si no, falla la instalación de `torch==...+cpu`:
-  ```
+
+  ```text
   --extra-index-url https://download.pytorch.org/whl/cpu
   ```
 
@@ -116,13 +121,13 @@ En el bloque 0 de `rag.py`, `PROVEEDOR` elige quién redacta la respuesta:
 
 | `PROVEEDOR` | Modelo | Costo | Velocidad | A tener en cuenta |
 | --- | --- | --- | --- | --- |
-| `"gemini"` (por defecto) | `gemini-3.8-flash` | Plan gratuito | Rápido | Límite de peticiones por día; en el plan gratuito, Google puede usar lo enviado para mejorar sus productos |
+| `"gemini"` (por defecto) | `gemini-3.5-flash-lite` | Plan gratuito | Rápido | Límite de peticiones por día; en el plan gratuito, Google puede usar lo enviado para mejorar sus productos |
 | `"groq"` | `openai/gpt-oss-120b` | Plan gratuito | Muy rápido | Límite de 8.000 tokens por minuto: alcanza para 1 o 2 preguntas por minuto |
 | `"ollama"` | `qwen3:8b` | Gratis | Lento en CPU | Nada sale de la computadora |
 
 Los proveedores en la nube solo reciben la pregunta y los fragmentos encontrados, nunca los PDFs completos. Aun así, **no los uses con datos de pacientes**: para eso está `"ollama"`.
 
-En el plan gratuito de Gemini, cada modelo tiene su propio límite diario. Si se agota, cambia el modelo en `MODELOS`, por ejemplo a `"gemini-3.5-flash-lite"`, o espera al día siguiente.
+En el plan gratuito de Gemini, cada modelo tiene su propio límite diario. Si se agota, o si un modelo sigue devolviendo el error 503 (servidor saturado), cambia el modelo en `MODELOS`, por ejemplo a `"gemini-3.8-flash"`, o pasa a `PROVEEDOR = "groq"`.
 
 ### Configurar la clave
 
@@ -130,10 +135,12 @@ En el plan gratuito de Gemini, cada modelo tiene su propio límite diario. Si se
    - Gemini: [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
    - Groq: [console.groq.com/keys](https://console.groq.com/keys)
 2. Guárdala como variable de entorno (no dentro de `rag.py`, para que no termine en Git):
+
    ```powershell
    setx GEMINI_API_KEY "tu_clave"
    setx GROQ_API_KEY "tu_clave"
    ```
+
 3. Cierra **todas** las ventanas de VS Code y vuelve a abrirlo. Comprueba con `echo $env:GEMINI_API_KEY`.
 
 Nunca pegues la clave completa en un chat, un archivo del proyecto ni un commit. Si eso pasa, bórrala en la consola del proveedor y crea otra.
@@ -143,25 +150,31 @@ Si falta la clave, el programa avisa al arrancar. Si se alcanza el límite gratu
 ## Uso
 
 1. Pon tus PDFs en `datos/`. Las fichas técnicas de [DATOS.md](DATOS.md) se descargan solas:
+
    ```powershell
    python .\descargar_fichas.py
    ```
+
 2. Revisa la carpeta antes de indexar:
+
    ```powershell
    python .\revisar_datos.py
    ```
+
    Avisa de PDFs escaneados sin texto, archivos que faltan en `fuentes.csv`, nombres poco claros y posibles duplicados.
 3. Ejecuta:
+
    ```powershell
    python .\rag.py
    ```
+
 4. Escribe tus preguntas. Para terminar, escribe `salir`.
 
 **Nombres de archivo:** usa nombres claros y **sin tildes ni eñes** (`Guia_mhGAP.pdf`, no `Guía_mhGAP-spa.pdf`). El modelo cita el nombre del archivo, y las tildes se desconfiguran al pasar los archivos entre Windows y Colab.
 
 Para cada pregunta, el programa muestra los fragmentos usados con su puntaje de similitud. Mientras el modelo escribe aparecen puntos, y al final la respuesta:
 
-```
+```text
 Fragmentos usados:
   -> [0.909] Interacciones_Farmacologicas_SEFH.pdf, página 9: Tabla 1. Fármacos que pueden causar...
   -> [0.894] Interacciones_Farmacologicas_SEFH.pdf, página 9: de receptores), en los procesos...
@@ -175,27 +188,33 @@ Respuesta:
 
 ## Indexar en la nube (Colab)
 
-Indexar los ~3.200 páginas en una computadora sin GPU tarda mucho. En Google Colab, con una GPU gratuita, es mucho más rápido.
+Indexar las ~3.300 páginas en una computadora sin GPU tarda mucho. En Google Colab, con una GPU gratuita, es mucho más rápido.
 
 1. En tu PC, comprime lo necesario:
+
    ```powershell
    Compress-Archive -Path rag.py, datos -DestinationPath NeuroClerk.zip -Force
    ```
+
 2. En [Colab](https://colab.research.google.com), crea un cuaderno, elige **Entorno de ejecución → Cambiar tipo de entorno → GPU T4** y sube `NeuroClerk.zip`.
 3. Ejecuta estas tres celdas:
+
    ```python
    !unzip -q -o NeuroClerk.zip -d /content/NeuroClerk
    %cd /content/NeuroClerk
    !pip install -q pdfplumber==0.11.10 chromadb==1.5.9 "cryptography>=50.0,<51" pypdf
    ```
+
    ```python
    !HF_HUB_OFFLINE=0 SOLO_INDEXAR=1 python rag.py
    ```
+
    ```python
    !zip -qr chroma_db.zip chroma_db
    from google.colab import files
    files.download("chroma_db.zip")
    ```
+
 4. En tu PC, borra la carpeta `chroma_db` vieja y descomprime `chroma_db.zip` en la raíz del proyecto. Al ejecutar `rag.py` deberías ver *"Ya indexado"* en todos los PDFs.
 
 El aviso de conflictos de dependencias que muestra `pip` en Colab se puede ignorar. El `rag.py` de tu PC tiene que ser el mismo que usaste en Colab.
@@ -223,7 +242,7 @@ El modelo trabaja con `temperature` 0.1, para que se apegue al texto. El tope de
 
 Si cambias `MODELO_EMBEDDINGS`, `TAM_CHUNK`, `SOLAPE` o `VERSION_TEXTO`, el programa crea una colección nueva y vuelve a indexar todo automáticamente. Para empezar de cero, borra la carpeta `chroma_db/`.
 
-Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la clave del modelo; `HF_HUB_OFFLINE=0` permite descargar el modelo de embeddings.
+Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la clave del modelo; `HF_HUB_OFFLINE=0` permite descargar el modelo de embeddings; `NEUROCLERK_MODELO` usa otro modelo del proveedor elegido, sin editar `MODELOS`.
 
 ## Pruebas
 
@@ -237,9 +256,11 @@ python .\probar_rag.py --buscar litemia FT_Litio.pdf   # busca una palabra en lo
 python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO     # por qué un fragmento llega o no al modelo
 ```
 
+Todos estos comandos importan `rag.py`, así que indexan lo que falte y, con `"gemini"` o `"groq"`, piden la clave del proveedor aunque no llamen al modelo.
+
 Opciones de `--llm`:
 
-- `--modelo NOMBRE`: modelo para la prueba. Por defecto usa `gemini-3.5-flash-lite`, porque el plan gratuito de `gemini-3.8-flash` no alcanza para las 19 preguntas. El programa normal (`rag.py`) sigue usando el modelo del bloque 0.
+- `--modelo NOMBRE`: modelo para la prueba. Por defecto usa `gemini-3.5-flash-lite`, porque el plan gratuito de `gemini-3.8-flash` no alcanza para las 19 preguntas. Ese valor no depende de `PROVEEDOR`: con `"groq"` u `"ollama"` hay que indicar el modelo con esta opción. El programa normal (`rag.py`) sigue usando el modelo del bloque 0.
 - `--pausa SEGUNDOS`: espera entre preguntas (por defecto 12), para no chocar con el límite de peticiones por minuto.
 
 Si el proveedor falla dos veces seguidas, la prueba deja de pedir respuestas y sigue solo con la búsqueda.
@@ -248,31 +269,33 @@ Para cada pregunta mide:
 
 - **Tabla:** si aparece la tabla del libro de interacciones que contiene la respuesta (casos 1 a 7).
 - **Fuente:** si aparece alguna fuente válida: la tabla, la ficha técnica, el DSM, la CIE-11, la guía o la escala que corresponda.
-- **Respuesta:** si la respuesta nombra las palabras clave. En los casos 1, 2, 3 y 7 son fármacos que figuran **solo en la tabla** y en ninguna de las 51 fichas, así que nombrarlos prueba que el modelo usó la tabla.
+- **Respuesta:** si la respuesta nombra las palabras clave. En los casos 1, 2, 3 y 7 son fármacos que figuran **solo en la tabla** y en ninguna de las fichas, así que nombrarlos prueba que el modelo usó la tabla.
 - **Abstención:** en dos preguntas cuya respuesta no está en los documentos (la dosis de esketamina y la capital de Uruguay), si el sistema se niega a responder en lugar de inventar.
 
 Los avisos del proveedor (límite alcanzado, servidor caído) se cuentan como errores y no como fallos.
 
-Línea de base del 27/10/2026, con los 59 documentos:
+Resultados:
 
-| Medida | Resultado |
-| --- | --- |
-| Tabla | 7/7 |
-| Fuente | 16/17 |
-| Respuesta | 12/17 |
-| Abstención | 2/2 |
+| Medida | Línea de base (27/10/2026, 59 documentos) | Última medición (05/11/2026, 61 documentos) |
+| --- | --- | --- |
+| Tabla | 7/7 | 7/7 |
+| Fuente | 16/17 | 17/17 |
+| Respuesta | 12/17 | 14/17 |
+| Abstención | 2/2 | 2/2 |
+
+La medición anterior a la última dio 13/17 en respuesta. El caso que se sumó es el 17, porque se agregaron palabras clave a la prueba, no porque mejorara el sistema. Siguen fallando los casos 12 (CIE-11), 13 (mhGAP) y 16 (PHQ-9).
 
 El detalle de cada caso y la evolución entre versiones están en la hoja de cálculo. Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas, anota el resultado en la hoja *Historial* y en el mensaje del commit.
 
 ## Documentos de prueba
 
-59 PDFs, unas 3.200 páginas. El detalle de cada uno está en `fuentes.csv`, y cómo conseguirlos, en [DATOS.md](DATOS.md).
+61 PDFs, unas 3.300 páginas. El detalle de cada uno está en `fuentes.csv`, y cómo conseguirlos, en [DATOS.md](DATOS.md).
 
 | Tipo | Documentos |
 | --- | --- |
 | Fichas técnicas | 51 psicofármacos y fármacos que interaccionan a menudo, descargados de [CIMA](https://cima.aemps.es) con `descargar_fichas.py` |
 | Interacciones | *Introducción a las interacciones farmacológicas* (SEFH) y la tabla de enzimas CYP450 de Flockhart |
-| Diagnóstico | DSM-5 y la guía de referencia de la CIE-11 (OMS) |
+| Diagnóstico | DSM-5-TR y la guía de referencia de la CIE-11 (OMS) |
 | Guías y formularios | Guía mhGAP (OMS/OPS) y Formulario Terapéutico de Medicamentos (MSP Uruguay) |
 | Escalas | PHQ-9, GAD-7, YMRS y PANSS |
 
@@ -294,18 +317,18 @@ Los PDFs no se suben al repositorio por su tamaño y por derechos de autor.
 | El entorno dejó de funcionar al renombrar la carpeta a `NeuroClerk` | En Windows, `.venv` guarda la ruta completa de la carpeta | Borrar `.venv`, recrearlo e instalar desde el lock; volver a elegir el intérprete en VS Code |
 | `ModuleNotFoundError: No module named 'pdfplumber'` | El lock se generó antes de instalar pdfplumber | `pip install -r requirements.txt` y regenerar el lock |
 | Los PDFs quedaron públicos en GitHub | Se subieron antes de agregar `datos/` al `.gitignore`, que no deja de seguir archivos ya subidos | Repositorio privado, `git filter-repo` para borrarlos del historial y repositorio nuevo para eliminar los commits huérfanos |
-| Indexar tardaba horas | Embeddings en CPU sobre ~3.200 páginas | Indexar en Colab con GPU; huella por contenido para reutilizar la base en la PC |
+| Indexar tardaba horas | Embeddings en CPU sobre miles de páginas | Indexar en Colab con GPU; huella por contenido para reutilizar la base en la PC |
 | "Quitando Gu├нa_mhGAP-spa.pdf" al volver de Colab | La tilde se desconfiguró al comprimir en Windows y descomprimir en Linux | Nombres de archivo sin tildes ni eñes |
 
 ### Calidad de la búsqueda
 
 | Problema | Causa | Solución |
 | --- | --- | --- |
-| El DSM-5 acaparaba todos los resultados | Es casi tres veces más grande que el resto | Traer candidatos de cada archivo por separado |
+| El DSM-5-TR acaparaba todos los resultados | Es casi tres veces más grande que el resto | Traer candidatos de cada archivo por separado |
 | Se ignoraba el final de cada fragmento | `MiniLM-L12` lee solo ~128 tokens (~80 palabras) | Cambiar a `multilingual-e5-base` (~300 palabras), con los prefijos `passage:` y `query:` |
 | Fragmentos sin relación con la pregunta | Siempre se traía la misma cantidad de cada archivo | Filtro por margen de similitud respecto al mejor |
 | Nombrar la fuente en la pregunta empeoraba la búsqueda | "según el DSM-5" atraía páginas que repiten "DSM-5" | Preguntar sin nombrar las fuentes |
-| Palabras cortadas ("tem- poral") | OCR del DSM-5 | Expresión regular que une las palabras al cargar |
+| Palabras cortadas ("tem- poral") | OCR del DSM-5-TR | Expresión regular que une las palabras al cargar |
 | Las tablas nunca se encontraban | pypdf las aplana en una lista de nombres sin título, partida en varios fragmentos | Extraerlas con `pdfplumber` como fragmentos propios con el título delante |
 | Las tablas largas con columnas no se encontraban | Se partían en trozos que mezclaban filas, y se juntaban columnas como *Sustratos* e *Inhibidores* | Un fragmento por fila, uno por categoría, y título heredado en las continuaciones |
 | Los libros grandes perdían frente a las fichas | Cada archivo aportaba 3 candidatos, tuviera 10 páginas o 367 | Cupo proporcional al tamaño: de 3 a 15 candidatos |
@@ -330,13 +353,13 @@ Pregunta de referencia: *"¿Qué es el síndrome neuroléptico maligno, cuáles 
 
 | Etapa | Búsqueda | Respuesta |
 | --- | --- | --- |
-| `llama3.2` + MiniLM | No encontraba la descripción del DSM-5 | La mayoría de las preguntas, mal |
-| `qwen3:8b` + e5 | Encontraba DSM-5 págs. 759–760 | 5 errores (síntomas invertidos, fármacos mal clasificados) |
+| `llama3.2` + MiniLM | No encontraba la descripción del DSM-5-TR | La mayoría de las preguntas, mal |
+| `qwen3:8b` + e5 | Encontraba DSM-5-TR págs. 759–760 | 5 errores (síntomas invertidos, fármacos mal clasificados) |
 | + prompt con citas y temperatura baja | Igual | 1 error (mezclaba dos síndromes) |
-| + filtro por similitud | 6–7 fragmentos, todos relevantes | Sin errores, pero sin usar el DSM-5 |
+| + filtro por similitud | 6–7 fragmentos, todos relevantes | Sin errores, pero sin usar el DSM-5-TR |
 | + regla "inclúyelos todos" | Igual | Combina 3 fuentes; 1 cita con la página equivocada |
 | + tablas con pdfplumber | La Tabla 1 aparece primera (0.909) | Incluye fármacos que solo están en la tabla |
-| + 59 documentos y Gemini | Tabla 1 primera, más DSM-5 y fichas | Lista completa de la tabla, DSM-5 y una ficha, sin errores y en segundos |
+| + 59 documentos y Gemini | Tabla 1 primera, más DSM-5-TR y fichas | Lista completa de la tabla, DSM-5-TR y una ficha, sin errores y en segundos |
 
 ## Limitaciones conocidas
 

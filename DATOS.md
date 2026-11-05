@@ -37,7 +37,7 @@ Nombra los archivos de forma clara (`FT_Litio.pdf`, no `FT_63845.pdf`), porque e
 | DSM-5-TR | Criterios diagnósticos | ✅ En uso. No se puede compartir |
 | CIE-11 (OMS), guía de referencia | Clasificación diagnóstica oficial y gratuita, en PDF | ✅ En uso (edición 2025-01) |
 
-Los documentos en inglés también sirven: `multilingual-e5-base` funciona bien con ellos.
+Los documentos en inglés rinden menos con preguntas en español. En una prueba con dos documentos en inglés sobre zolpidem, que después se quitaron, casi no llegaron al contexto al preguntar en español, porque sus fragmentos quedaban por debajo del umbral de similitud; preguntando en inglés sí llegaban. Conviene preferir fuentes en español.
 
 ## Guías clínicas y escalas
 

@@ -253,12 +253,12 @@ Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la
 python -m pytest
 ```
 
-`probar_rag.py` comprueba con 19 preguntas, de todos los tipos de documento, que la búsqueda encuentra las fuentes correctas y que el modelo las usa. Los casos también están en `casos_de_prueba_NeuroClerk.xlsx`, donde se anotan los resultados de cada ejecución.
+`probar_rag.py` comprueba con 28 preguntas, de todos los tipos de documento, que la búsqueda encuentra las fuentes correctas y que el modelo las usa. Los casos también están en `casos_de_prueba_NeuroClerk.xlsx`, donde se anotan los resultados de cada ejecución.
 
 ```powershell
 python .\probar_rag.py --verificar             # revisa que los casos estén bien armados
 python .\probar_rag.py                         # solo la búsqueda: rápido, no usa el modelo
-python .\probar_rag.py --llm                   # además pide la respuesta al modelo (19 peticiones)
+python .\probar_rag.py --llm                   # además pide la respuesta al modelo (28 peticiones)
 python .\probar_rag.py --buscar litemia FT_Litio.pdf   # busca una palabra en los documentos
 python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO     # por qué un fragmento llega o no al modelo
 ```
@@ -267,7 +267,7 @@ Todos estos comandos indexan lo que falte. Solo `--llm` pide la clave del provee
 
 Opciones de `--llm`:
 
-- `--modelo NOMBRE`: modelo para la prueba. Por defecto usa `gemini-3.5-flash-lite`, porque el plan gratuito de `gemini-3.8-flash` no alcanza para las 19 preguntas. Ese valor no depende de `PROVEEDOR`: con `"groq"` u `"ollama"` hay que indicar el modelo con esta opción. El programa normal (`rag.py`) sigue usando el modelo del bloque 0.
+- `--modelo NOMBRE`: modelo para la prueba. Por defecto usa `gemini-3.5-flash-lite`, porque el plan gratuito de `gemini-3.8-flash` no alcanza para todas las preguntas. Ese valor no depende de `PROVEEDOR`: con `"groq"` u `"ollama"` hay que indicar el modelo con esta opción. El programa normal (`rag.py`) sigue usando el modelo del bloque 0.
 - `--pausa SEGUNDOS`: espera entre preguntas (por defecto 12), para no chocar con el límite de peticiones por minuto.
 
 Si el proveedor falla dos veces seguidas, la prueba deja de pedir respuestas y sigue solo con la búsqueda.
@@ -278,6 +278,8 @@ Para cada pregunta mide:
 - **Fuente:** si aparece alguna fuente válida: la tabla, la ficha técnica, el DSM, la CIE-11, la guía o la escala que corresponda.
 - **Respuesta:** si la respuesta nombra las palabras clave. En los casos 1, 2, 3 y 7 son fármacos que figuran **solo en la tabla** y en ninguna de las fichas, así que nombrarlos prueba que el modelo usó la tabla.
 - **Abstención:** en dos preguntas cuya respuesta no está en los documentos (la dosis de esketamina y la capital de Uruguay), si el sistema se niega a responder en lugar de inventar.
+- **Dosis:** en 9 casos aparte, si da la dosis que está en los documentos, o ninguna cuando el fármaco está pero no hay dosis para ese uso (niños, indicación no autorizada). En el caso del zolpidem en niños puede citar la dosis de un estudio, siempre que deje claro que el uso no se recomienda.
+- **Respaldo:** en cualquier respuesta, si todas sus dosis aparecen en los fragmentos usados. No detecta una dosis que está en los fragmentos, pero corresponde a otro fármaco o a otro uso: las respuestas de los casos de dosis se muestran para revisarlas a mano.
 
 Los avisos del proveedor (límite alcanzado, servidor caído) se cuentan como errores y no como fallos.
 
@@ -289,6 +291,8 @@ Resultados:
 | Fuente | 16/17 | 17/17 |
 | Respuesta | 12/17 | 14/17 |
 | Abstención | 2/2 | 2/2 |
+| Dosis | — | 7/9 |
+| Respaldo de dosis | — | 7/7 |
 
 La medición anterior a la última dio 13/17 en respuesta. El caso que se sumó es el 17, porque se agregaron palabras clave a la prueba, no porque mejorara el sistema. Siguen fallando los casos 12 (CIE-11), 13 (mhGAP) y 16 (PHQ-9).
 
@@ -373,5 +377,6 @@ Pregunta de referencia: *"¿Qué es el síndrome neuroléptico maligno, cuáles 
 - **Hay que revisar las fuentes:** aunque los resultados son buenos, el modelo puede citar una página equivocada o mezclar conceptos parecidos.
 - **Límites del plan gratuito:** los proveedores en la nube limitan las peticiones por día o por minuto.
 - **PDFs escaneados sin texto:** si `extract_text()` devuelve vacío, hace falta OCR, que todavía no está implementado.
+- **Documentos en inglés:** con preguntas en español, sus fragmentos suelen quedar bajo el umbral de similitud y no llegan al modelo.
 - **Números de página:** son los del PDF, no los impresos en el libro.
 - **Preguntas comparativas** ("¿cuáles de estos cuatro fármacos...?") son difíciles para un RAG simple, porque la búsqueda trae fragmentos parecidos a la pregunta y no necesariamente el dato de cada documento.

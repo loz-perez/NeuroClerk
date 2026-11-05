@@ -2,7 +2,7 @@
 
 *Actualizada el 5 de noviembre de 2026.*
 
-NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 19 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 14 de 17, más 2 de 2 abstenciones. Para cerrar la fase 2 faltan tres casos que fallan (dos de búsqueda y uno del modelo), la regla de seguridad sobre dosis y el flujo de advertencias; después vienen el módulo de notas clínicas y la interfaz web.
+NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 14 de 17, más 2 de 2 abstenciones y 7 de 9 casos de dosis. Para cerrar la fase 2 faltan tres casos que fallan (dos de búsqueda y uno del modelo), la regla de seguridad sobre dosis y el flujo de advertencias; después vienen el módulo de notas clínicas y la interfaz web.
 
 ## De un vistazo
 
@@ -23,7 +23,7 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 | --- | --- | --- |
 | Lenguaje | Python 3.12 | Las versiones más nuevas todavía no tienen PyTorch disponible |
 | Modelo de lenguaje | `gemini-3.5-flash-lite` (nube); `openai/gpt-oss-120b` en Groq y `qwen3:8b` en Ollama como alternativas | Gemini responde en segundos y usa bien las tablas; Ollama queda para datos que no deben salir de la PC |
-| Modelo para las pruebas | `gemini-3.5-flash-lite` | Su cupo gratuito alcanza para correr las 19 pruebas seguidas |
+| Modelo para las pruebas | `gemini-3.5-flash-lite` | Su cupo gratuito alcanzó para correr las 28 pruebas seguidas |
 | Framework RAG | Código propio en `rag.py` | Para aprender cómo funciona cada paso; un framework queda para más adelante |
 | Embeddings | `intfloat/multilingual-e5-base` | Lee unas 300 palabras por fragmento; MiniLM solo leía unas 80 |
 | Base vectorial | ChromaDB 1.5.9, guardada en disco | Evita recalcular los vectores en cada ejecución |
@@ -60,7 +60,7 @@ Hecho:
 - Limpieza del texto escaneado (palabras cortadas con guion).
 - Modelo en la nube (Gemini o Groq) con streaming y reintentos automáticos ante errores pasajeros y límites de uso.
 - Indexación en Colab con GPU, con huella por contenido para reutilizar la base en la PC.
-- Pruebas automáticas con `probar_rag.py`: 19 casos sobre tablas de interacciones, fichas técnicas, criterios del DSM-5-TR, la CIE-11, la guía mhGAP, el Formulario, las escalas, un caso clínico y dos preguntas en las que debe abstenerse.
+- Pruebas automáticas con `probar_rag.py`: 28 casos sobre tablas de interacciones, fichas técnicas, criterios del DSM-5-TR, la CIE-11, la guía mhGAP, el Formulario, las escalas, un caso clínico, dos preguntas en las que debe abstenerse y 9 casos de dosis.
   - Antes de medir, `--verificar` comprueba que cada palabra clave esté en su fuente.
   - Para diagnosticar un fallo, `--buscar` y `--ranking` muestran qué fragmentos existen y cuál de los filtros los deja afuera.
 
@@ -81,6 +81,11 @@ Falta:
   - **CIE-11 (búsqueda):** la página 504, con la equivalencia de la esquizofrenia, no llega al contexto, ni siquiera con la pregunta reformulada.
   - **PHQ-9 (búsqueda):** llega solo la página 1 del cuestionario; el 27 aparece únicamente en la página 2 ("20-27 Severe").
   - **mhGAP (modelo):** con el tope de 12 ya llega el Cuadro 1 de antidepresivos (página 37, puesto 5), pero el modelo responde que el contexto no alcanza.
+- Resolver los casos de dosis que fallan (línea de base 7/9, respaldo 7/7, sin regla en el prompt):
+  - **Escitalopram en mayores de 65 (modelo):** la dosis llega al contexto, pero responde que no está.
+  - **Lamotrigina con valproato (búsqueda):** la pauta de 12,5 mg/día no llega al contexto. El modelo se abstiene y no da la dosis equivocada.
+- Documentos en inglés: con preguntas en español casi no llegan al contexto. Dos documentos sobre zolpidem que se probaron y se quitaron no aparecieron en ninguno de los 28 casos, y es posible que a la tabla de Flockhart le pase lo mismo.
+- Respuestas cortadas: en una ejecución, el caso del litio respondió solo "Bas" y se contó como fallo. La prueba debería contarlo como error, y conviene revisar si `generar()` detecta el corte.
 - Revisar si el límite por página corta listas largas: en la tabla de inhibidores del CYP2D6, la continuación queda afuera.
 - Agregar al prompt la regla de no dar dosis que no estén textuales en un fragmento citado, y medirla con las pruebas.
 - Un flujo de consulta tipo *"Paciente toma fluoxetina, ¿puedo añadir tramadol?"* con una advertencia destacada. Hoy responde en texto libre.
@@ -108,7 +113,7 @@ Las citas por afirmación y las pruebas automáticas cubren buena parte de la re
 
 | Regla | Estado | Qué hay hoy | Qué falta |
 | --- | --- | --- | --- |
-| Cero alucinaciones en dosis | Parcial | Responde solo con el contexto, cita cada afirmación, temperatura 0.1; una prueba comprueba que no invente la dosis de un fármaco que no está en los documentos | Una regla explícita en el prompt: no dar dosis que no estén textuales en un fragmento citado |
+| Cero alucinaciones en dosis | Parcial | Responde solo con el contexto, cita cada afirmación, temperatura 0.1; una prueba comprueba que no invente la dosis de un fármaco que no está en los documentos; 9 casos de dosis y un chequeo de que cada dosis de la respuesta esté en los fragmentos | Una regla explícita en el prompt: no dar dosis que no estén textuales en un fragmento citado |
 | Humano en el bucle | Parcial | Muestra los fragmentos usados para verificar cada dato | La revisión y firma de notas llega con la fase 3 |
 | Datos sintéticos | Pendiente | Todavía no se usan datos de pacientes | Escribir los casos ficticios para las fases 2 y 3 |
 | Privacidad | Parcial | La búsqueda es local; los PDFs, la base vectorial y las claves no se suben a Git, y el repositorio es privado; Ollama permite trabajar sin enviar nada fuera | Con Gemini o Groq, la pregunta y los fragmentos salen a la nube: datos de pacientes, solo con Ollama |
@@ -125,6 +130,7 @@ Primero se cierra la fase 2 con los casos que fallan y las reglas de seguridad, 
 - [x] Medir el tope de 12 fragmentos y la pregunta nueva de la CIE-11.
 - [ ] Resolver los casos de la CIE-11, el PHQ-9 y la mhGAP.
 - [ ] Corregir `_parecido`: devuelve 0.0 con dos textos idénticos, así que no los descarta como duplicados. Hay una prueba marcada como `xfail` en `test_rag.py`; al corregirlo, quitar la marca y volver a medir.
+- [x] Casos de prueba de dosis y línea de base: 7/9, respaldo 7/7.
 - [ ] Agregar al prompt la regla de no dar dosis que no estén textuales en un fragmento citado.
 - [ ] Flujo de advertencias para consultas de combinación de fármacos.
 - [ ] Escribir los casos clínicos ficticios: pacientes con su medicación, para la consulta farmacológica, y notas en texto libre, para el SOAP.

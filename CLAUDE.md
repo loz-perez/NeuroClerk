@@ -21,8 +21,8 @@ python -m pytest                                      # pruebas unitarias de las
 python -m pytest test_rag.py::test_parecido_es_la_proporcion_de_palabras_compartidas   # una sola prueba
 
 python .\probar_rag.py --verificar                    # revisa que los casos estén bien armados
-python .\probar_rag.py                                # los 19 casos, solo búsqueda (no llama al modelo)
-python .\probar_rag.py --llm                          # además pide las respuestas (19 peticiones, gasta cupo)
+python .\probar_rag.py                                # los 28 casos, solo búsqueda (no llama al modelo)
+python .\probar_rag.py --llm                          # además pide las respuestas (28 peticiones, gasta cupo)
 python .\probar_rag.py --llm --modelo NOMBRE --pausa 15
 python .\probar_rag.py --buscar PALABRA [ARCHIVO]     # qué fragmentos contienen una palabra
 python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO   # qué filtro deja afuera a un fragmento

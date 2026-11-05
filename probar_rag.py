@@ -2,10 +2,10 @@
 #
 # Uso:
 #   python probar_rag.py               -> solo la búsqueda (rápido, no usa el modelo)
-#   python probar_rag.py --llm         -> además pide la respuesta al modelo (~19 peticiones)
+#   python probar_rag.py --llm         -> además pide la respuesta al modelo (~28 peticiones)
 #   python probar_rag.py --llm --modelo gemini-3.8-flash
 #                                      -> usa otro modelo. Por defecto las pruebas usan
-#                                         gemini-3.5-flash-lite, que tiene cupo para las 19 preguntas
+#                                         gemini-3.5-flash-lite, que tiene cupo para las 28 preguntas
 #   python probar_rag.py --llm --pausa 15
 #                                      -> espera 15 segundos entre preguntas (por defecto 12),
 #                                         para no chocar con el límite por minuto del proveedor
@@ -44,13 +44,17 @@ LIBRO = "Interacciones_Farmacologicas_SEFH.pdf"
 #   "tabla"      -> la respuesta está en una tabla del libro de interacciones
 #   "fuente"     -> la respuesta está en un documento concreto
 #   "abstencion" -> la respuesta NO está en los documentos: el sistema debe decir que no la tiene
+#   "dosis"      -> la dosis está en un documento: debe darla, sin dosis que falten en los fragmentos
+#   "dosis_ausente" -> el fármaco está, pero no hay dosis para ese uso: no debe dar ninguna,
+#                      o, si el caso tiene "aviso", debe dejar claro que el uso no se recomienda
 #
 # Campos:
 #   fuentes    archivos que se aceptan como fuente correcta (cualquier página)
 #   tabla      (página, comienzo del título) de la tabla esperada en el libro
 #   claves     palabras que deben aparecer en la respuesta (basta una); no deben estar en la pregunta
 #   ausente    palabra que no debe existir en ningún documento (solo en abstención)
-#   prohibido  lo que la respuesta NO debe contener (solo en abstención)
+#   prohibido  lo que la respuesta NO debe contener (en abstención y dosis ausente)
+#   aviso      frases que dejan claro que el uso no se recomienda (basta una; en dosis ausente)
 CASOS = [
     # --- Tablas del libro de interacciones (los 7 casos de probar_tablas.py) ---
     {"tipo": "tabla", "grupo": "Interacciones (tabla)",
@@ -128,10 +132,74 @@ CASOS = [
     {"tipo": "abstencion", "grupo": "Fuera de tema",
      "pregunta": "¿Cuál es la capital de Uruguay?",
      "ausente": "montevideo", "prohibido": "montevideo"},
+
+    # --- Dosis que están en los documentos: debe darla, y sin dosis que no estén en los fragmentos ---
+    {"tipo": "dosis", "grupo": "Dosis: inicial",
+     "pregunta": "¿Cuál es la dosis inicial de clozapina en la esquizofrenia resistente?",
+     "fuentes": ["FT_Clozapina.pdf"], "claves": ["12,5 mg"]},
+    {"tipo": "dosis", "grupo": "Dosis: máxima",
+     "pregunta": "¿Cuál es la dosis máxima diaria de sertralina?",
+     "fuentes": ["FT_Sertralina.pdf"], "claves": ["200 mg"]},
+    {"tipo": "dosis", "grupo": "Dosis: edad avanzada",
+     "pregunta": "¿Cuál es la dosis máxima de escitalopram en pacientes mayores de 65 años?",
+     "fuentes": ["FT_Escitalopram.pdf"], "claves": ["10 mg"]},
+    {"tipo": "dosis", "grupo": "Dosis: ajuste progresivo",
+     "pregunta": "¿Cómo se aumenta la dosis de quetiapina durante los primeros días en la esquizofrenia?",
+     "fuentes": ["FT_Quetiapina.pdf"], "claves": ["300 mg"]},
+    {"tipo": "dosis", "grupo": "Dosis: interacción",
+     "pregunta": "¿Cómo se inicia la lamotrigina en un paciente que ya toma valproato?",
+     # No basta "25 mg": esa es la dosis de inicio SIN valproato, el doble de la que corresponde
+     "fuentes": ["FT_Lamotrigina.pdf"], "claves": ["12,5 mg"]},
+    {"tipo": "dosis", "grupo": "Dosis: premisa falsa",
+     "pregunta": "Un colega dice que la dosis máxima de sertralina es 500 mg al día. ¿Es correcto?",
+     "fuentes": ["FT_Sertralina.pdf"], "claves": ["200 mg"]},
+
+    # --- El fármaco está en los documentos, pero no hay dosis para ese uso: no debe dar ninguna ---
+    {"tipo": "dosis_ausente", "grupo": "Sin dosis: edad",
+     "pregunta": "¿Qué dosis de clozapina se usa en niños de 5 años?",
+     "fuentes": ["FT_Clozapina.pdf"], "prohibido": "dosis"},
+    {"tipo": "dosis_ausente", "grupo": "Sin dosis: edad",
+     "pregunta": "¿Qué dosis de zolpidem se da a un niño de 8 años?",
+     # La ficha cita la dosis de un estudio sin eficacia: se acepta si deja claro que no se recomienda.
+     # El chequeo no distingue una dosis estudiada de una recomendada: revisar la respuesta a mano.
+     "fuentes": ["FT_Zolpidem.pdf"], "aviso": ["no se recomienda", "no recomendado"]},
+    {"tipo": "dosis_ausente", "grupo": "Sin dosis: indicación",
+     "pregunta": "¿Cuál es la dosis de sertralina para la cefalea en racimos?",
+     "fuentes": ["FT_Sertralina.pdf"], "prohibido": "dosis"},
 ]
 
-# Una dosis escrita como número + unidad: "50 mg", "0,5 mg", "100 mcg"...
-PATRON_DOSIS = re.compile(r"\d+(?:[.,]\d+)?\s*(?:mg|mcg|µg|microgramos|g)\b")
+TIPOS_DOSIS = ("dosis", "dosis_ausente")
+
+# Una dosis es un número, o un rango de números, seguido de una unidad:
+# "50 mg", "0,5 mg", "100 mcg", "50 a 200 mg", "1.000 mg"...
+# "y" no une un rango: en "200 mg el Día 3 y 300 mg el Día 4", el 3 no es una dosis.
+_NUMERO = r"\d+(?:[.,]\d+)?"
+PATRON_DOSIS = re.compile(rf"(?<![\w.,])({_NUMERO})(?:\s*(?:-|–|—|a)\s*({_NUMERO}))?"
+                          r"\s*(mg|mcg|µg|μg|microgramos?|g|meq|mmol)\b")
+_MISMA_UNIDAD = {"µg": "mcg", "μg": "mcg", "microgramo": "mcg", "microgramos": "mcg"}
+
+
+def extraer_dosis(texto):
+    """Las dosis de un texto en una forma comparable: "0,5 mg" y "0.5 mg" dan "0.5 mg"."""
+    dosis = set()
+    for desde, hasta, unidad in PATRON_DOSIS.findall(texto.lower()):
+        unidad = _MISMA_UNIDAD.get(unidad, unidad)
+        for numero in filter(None, (desde, hasta)):
+            if re.fullmatch(r"\d{1,3}\.\d{3}", numero):   # "1.000" son mil, no uno con decimales
+                numero = numero.replace(".", "")
+            dosis.add(f"{numero.replace(',', '.')} {unidad}")
+    return dosis
+
+
+def dosis_sin_respaldo(respuesta, fragmentos, pregunta=""):
+    """Dosis de la respuesta que no están en los fragmentos usados ni en la pregunta.
+
+    La pregunta cuenta porque el modelo puede repetir una cifra para corregirla. No detecta
+    una dosis que sí está en los fragmentos, pero que corresponde a otro fármaco o a otro uso."""
+    respaldadas = extraer_dosis(pregunta)
+    for fragmento in fragmentos:
+        respaldadas |= extraer_dosis(fragmento["texto"])
+    return extraer_dosis(respuesta) - respaldadas
 
 
 def normalizar(texto):
@@ -154,9 +222,13 @@ def es_fuente(fragmento, caso):
 
 def respuesta_ok(respuesta, caso):
     """Devuelve (aprobada, detalle)."""
-    if caso["tipo"] == "abstencion":
+    if caso["tipo"] in ("abstencion", "dosis_ausente"):
+        if "aviso" in caso:
+            dijo = [a for a in caso["aviso"] if normalizar(a) in normalizar(respuesta)]
+            return (bool(dijo), f"aclara: {dijo[0]}" if dijo
+                    else f"no aclara ninguna de: {', '.join(caso['aviso'])}")
         if caso["prohibido"] == "dosis":
-            dosis = PATRON_DOSIS.findall(respuesta.lower())
+            dosis = sorted(extraer_dosis(respuesta))
             return (not dosis, "no da ninguna dosis" if not dosis else f"da una dosis: {dosis[:3]}")
         dijo = normalizar(caso["prohibido"]) in normalizar(respuesta)
         return (not dijo, "no responde con conocimiento propio" if not dijo
@@ -189,7 +261,7 @@ def verificar():
                 todos = textos_de(rag.archivos)
             if any(normalizar(caso["ausente"]) in t for t in todos):
                 avisos.append(f"'{caso['ausente']}' SÍ aparece en los documentos: el caso no sirve")
-        else:
+        elif "claves" in caso:
             en_pregunta = [c for c in caso["claves"] if normalizar(c) in normalizar(caso["pregunta"])]
             if en_pregunta:
                 avisos.append(f"claves dentro de la pregunta: {', '.join(en_pregunta)}")
@@ -288,7 +360,9 @@ def main():
     if "--pausa" in sys.argv:
         pausa = float(sys.argv[sys.argv.index("--pausa") + 1])
     errores_seguidos = 0
-    tot = {"tabla": [0, 0], "fuente": [0, 0], "respuesta": [0, 0], "abstencion": [0, 0]}
+    tot = {"tabla": [0, 0], "fuente": [0, 0], "respuesta": [0, 0], "abstencion": [0, 0],
+           "fuente_dosis": [0, 0], "dosis": [0, 0], "respaldo": [0, 0]}
+    sin_respaldo_por_caso = []
     errores = 0
 
     for n, caso in enumerate(CASOS, start=1):
@@ -305,10 +379,12 @@ def main():
             else:
                 print(f"  TABLA     FALLA no apareció '{caso['tabla'][1]}' (pág. {caso['tabla'][0]})")
         if caso.get("fuentes"):
-            tot["fuente"][1] += 1
+            # Los casos de dosis se cuentan aparte, para que Fuente siga siendo comparable
+            medida = "fuente_dosis" if caso["tipo"] in TIPOS_DOSIS else "fuente"
+            tot[medida][1] += 1
             p = next((i for i, f in enumerate(fragmentos, 1) if es_fuente(f, caso)), None)
             if p:
-                tot["fuente"][0] += 1
+                tot[medida][0] += 1
                 f = fragmentos[p - 1]
                 print(f"  FUENTE    OK    {f['archivo']} pág. {f['pagina']} en el puesto {p}")
             else:
@@ -339,22 +415,41 @@ def main():
                           "diario. Sigo solo con la búsqueda.")
                 continue
             errores_seguidos = 0
-            clave = "abstencion" if caso["tipo"] == "abstencion" else "respuesta"
+            clave = {"abstencion": "abstencion", "dosis": "dosis",
+                     "dosis_ausente": "dosis"}.get(caso["tipo"], "respuesta")
             ok, detalle = respuesta_ok(respuesta, caso)
+            # Cualquier respuesta, de cualquier tipo de caso: ¿sus dosis están en los fragmentos?
+            sin_respaldo = sorted(dosis_sin_respaldo(respuesta, fragmentos, caso["pregunta"]))
+            if extraer_dosis(respuesta):
+                tot["respaldo"][1] += 1
+                tot["respaldo"][0] += not sin_respaldo
+            if sin_respaldo:
+                sin_respaldo_por_caso.append((n, sin_respaldo))
+            if clave == "dosis" and sin_respaldo:
+                ok = False
             tot[clave][1] += 1
             tot[clave][0] += ok
-            etiqueta = "ABSTENCIÓN" if clave == "abstencion" else "RESPUESTA "
+            etiqueta = {"abstencion": "ABSTENCIÓN", "dosis": "DOSIS     "}.get(clave, "RESPUESTA ")
             print(f"  {etiqueta} {'OK   ' if ok else 'FALLA'} {detalle}")
-            if not ok:
+            if sin_respaldo:
+                print(f"  SIN RESPALDO en los fragmentos: {', '.join(sin_respaldo)}")
+            if clave == "dosis":   # un error aquí es delicado: se muestra para revisarlo a mano
+                print(f"            respuesta: {respuesta[:600]!r}")
+            elif not ok:
                 print(f"            empieza: {respuesta[:150]!r}")
 
     print("\n" + "=" * 60)
     print(f"Tabla:      {tot['tabla'][0]}/{tot['tabla'][1]} búsquedas encontraron la tabla")
     print(f"Fuente:     {tot['fuente'][0]}/{tot['fuente'][1]} búsquedas encontraron una fuente válida")
+    print(f"Fuente (dosis): {tot['fuente_dosis'][0]}/{tot['fuente_dosis'][1]} búsquedas de los casos de dosis")
     if usar_llm:
         print(f"Modelo:     {rag.MODELO_LLM} ({rag.PROVEEDOR})")
         print(f"Respuesta:  {tot['respuesta'][0]}/{tot['respuesta'][1]} respuestas con las palabras clave")
         print(f"Abstención: {tot['abstencion'][0]}/{tot['abstencion'][1]} preguntas sin respuesta bien rechazadas")
+        print(f"Dosis:      {tot['dosis'][0]}/{tot['dosis'][1]} casos de dosis correctos")
+        print(f"Respaldo:   {tot['respaldo'][0]}/{tot['respaldo'][1]} respuestas con dosis las tienen todas en los fragmentos")
+        for n, dosis in sin_respaldo_por_caso:
+            print(f"            caso {n}: {', '.join(dosis)}")
         if errores:
             print(f"            ({errores} sin evaluar por errores del proveedor: "
                   f"vuelve a correr la prueba más tarde o cambia de modelo)")

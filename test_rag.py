@@ -7,6 +7,7 @@
 
 import pytest
 
+from probar_rag import dosis_sin_respaldo, extraer_dosis, respuesta_ok
 from rag import _parecido, dividir_en_chunks, tabla_a_unidades
 
 
@@ -143,3 +144,69 @@ def test_parecido_filas_de_una_tabla_no_cuentan_el_titulo_que_repiten():
                                        "iguales no queda nada que comparar y devuelve 0.0, no 1.0.")
 def test_parecido_textos_identicos_es_uno():
     assert _parecido("alfa beta gamma", "alfa beta gamma") == 1.0
+
+
+# ---------------------------------------------------------------
+# extraer_dosis y dosis_sin_respaldo (probar_rag.py)
+# ---------------------------------------------------------------
+@pytest.mark.parametrize("texto, esperado", [
+    ("50 mg una vez al día", {"50 mg"}),
+    ("50mg/día", {"50 mg"}),
+    ("12,5 MG", {"12.5 mg"}),
+    ("12.5 mg", {"12.5 mg"}),
+    ("de 50 a 200 mg", {"50 mg", "200 mg"}),
+    ("50-200 mg", {"50 mg", "200 mg"}),
+    ("1.000 mg", {"1000 mg"}),
+    ("100 microgramos", {"100 mcg"}),
+    ("100 µg", {"100 mcg"}),
+    ("0,6 mEq/l", {"0.6 meq"}),
+    ("1 g", {"1 g"}),
+])
+def test_extraer_dosis_reconoce_las_formas_de_escribirla(texto, esperado):
+    assert extraer_dosis(texto) == esperado
+
+
+@pytest.mark.parametrize("texto", [
+    "", "dos semanas", "CYP2D6", "50 pacientes", "página 12", "12 gotas", "27 puntos",
+])
+def test_extraer_dosis_ignora_lo_que_no_es_dosis(texto):
+    assert extraer_dosis(texto) == set()
+
+
+def test_extraer_dosis_no_confunde_un_numero_de_dia_con_una_dosis():
+    assert extraer_dosis("200 mg el Día 3 y 300 mg el Día 4") == {"200 mg", "300 mg"}
+
+
+CASO_CON_AVISO = {"tipo": "dosis_ausente", "aviso": ["no se recomienda", "no recomendado"]}
+
+
+def test_aviso_acepta_la_dosis_de_un_estudio_si_aclara_que_no_se_recomienda():
+    respuesta = "No se recomienda en niños. Un estudio con 0,25 mg/kg/día no demostró eficacia."
+    assert respuesta_ok(respuesta, CASO_CON_AVISO)[0]
+
+
+@pytest.mark.parametrize("respuesta", ["El contexto no alcanza para responder.", "Se dan 10 mg al día."])
+def test_aviso_falla_si_no_aclara_que_no_se_recomienda(respuesta):
+    assert not respuesta_ok(respuesta, CASO_CON_AVISO)[0]
+
+
+def test_dosis_ausente_sin_aviso_sigue_sin_aceptar_ninguna_dosis():
+    caso = {"tipo": "dosis_ausente", "prohibido": "dosis"}
+    assert respuesta_ok("El contexto no alcanza.", caso)[0]
+    assert not respuesta_ok("No se recomienda, pero se usan 10 mg.", caso)[0]
+
+
+def test_dosis_sin_respaldo_avisa_de_la_que_no_esta_en_los_fragmentos():
+    fragmentos = [{"texto": "La dosis máxima es de 200 mg/día."}]
+    assert dosis_sin_respaldo("Máximo 200 mg; algunos usan 300 mg.", fragmentos) == {"300 mg"}
+
+
+def test_dosis_sin_respaldo_acepta_otra_forma_de_escribir_la_misma_dosis():
+    assert dosis_sin_respaldo("Empieza con 12.5 mg.", [{"texto": "12,5 mg el primer día"}]) == set()
+
+
+def test_dosis_sin_respaldo_acepta_la_cifra_que_ya_estaba_en_la_pregunta():
+    fragmentos = [{"texto": "La dosis máxima es de 200 mg/día."}]
+    respuesta = "No: el máximo es 200 mg, no 500 mg."
+    assert dosis_sin_respaldo(respuesta, fragmentos, "¿Es de 500 mg?") == set()
+    assert dosis_sin_respaldo(respuesta, fragmentos) == {"500 mg"}

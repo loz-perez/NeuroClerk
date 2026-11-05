@@ -33,11 +33,10 @@ Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (ca
 
 `rag.py` es el programa completo y está organizado en bloques numerados: 0 configuración, 1 carga de PDF (`pypdf`) y tablas (`pdfplumber`), 2 división, 3 indexación en ChromaDB, 4 `recuperar()`, 5 `responder()` y `generar()`, 6 bucle interactivo. Los parámetros se cambian en el bloque 0.
 
-**Importar `rag.py` tiene efectos.** La preparación corre a nivel de módulo, no dentro de `__main__`, así que `import rag` hace todo esto:
+**Importar `rag.py` no tiene efectos.** Solo define funciones y valores, y mantenerlo así permite probarlo sin el modelo ni la base. Quien lo use llama explícitamente a:
 
-- Sale con error si falta la clave del proveedor, incluso para las pruebas de solo búsqueda.
-- Carga el modelo de embeddings e indexa los PDFs nuevos o modificados.
-- **Borra de la base los vectores de cualquier PDF que ya no esté en `datos/`.**
+- `rag.comprobar_clave()`: sale con error si falta la clave del proveedor. Solo hace falta cuando se va a llamar al modelo.
+- `rag.preparar()`: carga el modelo de embeddings, abre ChromaDB e indexa los PDFs nuevos o modificados. **También borra de la base los vectores de cualquier PDF que ya no esté en `datos/`.** `modelo_emb`, `coleccion`, `archivos` y `CUPO` quedan vacíos hasta llamarla, y `recuperar()` y `responder()` la necesitan.
 
 **Identidad del índice.** El nombre de la colección es un hash de `MODELO_EMBEDDINGS|TAM_CHUNK|SOLAPE|VERSION_TEXTO`:
 
@@ -51,7 +50,7 @@ Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (ca
 
 **Relación entre `rag.py` y `probar_rag.py`.** Cambiar uno de estos puntos puede romper las pruebas sin que se note a simple vista:
 
-- `probar_rag.py` usa `rag.coleccion`, `rag.recuperar`, `rag.responder`, `rag.archivos`, `rag.CUPO`, `rag.modelo_emb`, `rag.MARGEN`, `rag.K_MIN` y `rag.PREFIJO_PREGUNTA`.
+- `probar_rag.py` usa `rag.preparar`, `rag.comprobar_clave`, `rag.coleccion`, `rag.recuperar`, `rag.responder`, `rag.archivos`, `rag.CUPO`, `rag.modelo_emb`, `rag.MARGEN`, `rag.K_MIN` y `rag.PREFIJO_PREGUNTA`.
 - Los avisos del proveedor (límite alcanzado, servidor caído) se devuelven como texto que empieza con `[`, y las pruebas los detectan así para contarlos como errores y no como fallos.
 - Los casos de tabla comparan la página y el comienzo del texto del fragmento con el título esperado, así que cambiar el formato de los fragmentos de tabla afecta esos casos.
 - `probar_rag.py` fija `NEUROCLERK_MODELO` antes de importar `rag` y usa por defecto `gemini-3.5-flash-lite`, aunque `PROVEEDOR` sea otro. Con Groq u Ollama hay que pasar `--modelo`.

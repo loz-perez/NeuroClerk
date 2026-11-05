@@ -43,6 +43,7 @@ NeuroClerk/
 ├── rag.py                 # el programa completo
 ├── probar_rag.py          # pruebas automáticas de búsqueda y respuesta
 ├── probar_tablas.py       # prueba anterior; sus 7 casos ya están en probar_rag.py
+├── test_rag.py            # pruebas unitarias de las funciones puras (pytest)
 ├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
 ├── descargar_fichas.py    # descarga las fichas técnicas de CIMA
 ├── revisar_datos.py       # revisa la carpeta datos/ antes de indexar
@@ -245,6 +246,12 @@ Si cambias `MODELO_EMBEDDINGS`, `TAM_CHUNK`, `SOLAPE` o `VERSION_TEXTO`, el prog
 Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la clave del modelo; `HF_HUB_OFFLINE=0` permite descargar el modelo de embeddings; `NEUROCLERK_MODELO` usa otro modelo del proveedor elegido, sin editar `MODELOS`.
 
 ## Pruebas
+
+`test_rag.py` comprueba con pytest las funciones puras: `dividir_en_chunks`, `tabla_a_unidades` y `_parecido`. No necesita el modelo, la base, los PDFs ni claves, y tarda menos de un segundo:
+
+```powershell
+python -m pytest
+```
 
 `probar_rag.py` comprueba con 19 preguntas, de todos los tipos de documento, que la búsqueda encuentra las fuentes correctas y que el modelo las usa. Los casos también están en `casos_de_prueba_NeuroClerk.xlsx`, donde se anotan los resultados de cada ejecución.
 

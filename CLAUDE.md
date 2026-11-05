@@ -17,6 +17,9 @@ python .\rag.py                  # indexa lo que falte y abre la consulta intera
 python .\revisar_datos.py        # revisa datos/ antes de indexar (escaneados, fuentes.csv, duplicados)
 python .\descargar_fichas.py     # descarga de CIMA las fichas que falten y actualiza fuentes.csv
 
+python -m pytest                                      # pruebas unitarias de las funciones puras (test_rag.py)
+python -m pytest test_rag.py::test_parecido_es_la_proporcion_de_palabras_compartidas   # una sola prueba
+
 python .\probar_rag.py --verificar                    # revisa que los casos estén bien armados
 python .\probar_rag.py                                # los 19 casos, solo búsqueda (no llama al modelo)
 python .\probar_rag.py --llm                          # además pide las respuestas (19 peticiones, gasta cupo)
@@ -25,7 +28,7 @@ python .\probar_rag.py --buscar PALABRA [ARCHIVO]     # qué fragmentos contiene
 python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO   # qué filtro deja afuera a un fragmento
 ```
 
-No hay pytest, linter ni CI, y tampoco una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. Las pruebas no se pueden correr sin `datos/` y `chroma_db/`, que no están en Git.
+`test_rag.py` corre sin el modelo, la base, los PDFs ni claves. `probar_rag.py` mide la búsqueda y las respuestas, necesita `datos/` y `chroma_db/`, que no están en Git, y no tiene una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. No hay linter ni CI.
 
 Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (cambia el modelo sin editar el código), `SOLO_INDEXAR=1` (indexa y termina), `HF_HUB_OFFLINE=0` (permite descargar el modelo de embeddings; por defecto `rag.py` trabaja sin conexión).
 

@@ -43,6 +43,7 @@ NeuroClerk/
 ├── rag.py                 # el programa completo
 ├── probar_rag.py          # pruebas automáticas de búsqueda y respuesta
 ├── probar_tablas.py       # prueba anterior; sus 7 casos ya están en probar_rag.py
+├── test_rag.py            # pruebas unitarias de las funciones puras (pytest)
 ├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
 ├── descargar_fichas.py    # descarga las fichas técnicas de CIMA
 ├── revisar_datos.py       # revisa la carpeta datos/ antes de indexar
@@ -246,6 +247,12 @@ Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la
 
 ## Pruebas
 
+`test_rag.py` comprueba con pytest las funciones puras: `dividir_en_chunks`, `tabla_a_unidades` y `_parecido`. No necesita el modelo, la base, los PDFs ni claves, y tarda menos de un segundo:
+
+```powershell
+python -m pytest
+```
+
 `probar_rag.py` comprueba con 19 preguntas, de todos los tipos de documento, que la búsqueda encuentra las fuentes correctas y que el modelo las usa. Los casos también están en `casos_de_prueba_NeuroClerk.xlsx`, donde se anotan los resultados de cada ejecución.
 
 ```powershell
@@ -256,7 +263,7 @@ python .\probar_rag.py --buscar litemia FT_Litio.pdf   # busca una palabra en lo
 python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO     # por qué un fragmento llega o no al modelo
 ```
 
-Todos estos comandos importan `rag.py`, así que indexan lo que falte y, con `"gemini"` o `"groq"`, piden la clave del proveedor aunque no llamen al modelo.
+Todos estos comandos indexan lo que falte. Solo `--llm` pide la clave del proveedor, porque es el único que llama al modelo.
 
 Opciones de `--llm`:
 

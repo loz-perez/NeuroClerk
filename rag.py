@@ -4,21 +4,21 @@
 # Luego busca los fragmentos más parecidos a tu pregunta y se los pasa al modelo de lenguaje,
 # que puede ser local (Ollama) o en la nube (Gemini o Groq).
 
-import os
-# Usa el modelo ya descargado. Para descargarlo (primera vez, o en Colab): HF_HUB_OFFLINE=0
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-# SOLO_INDEXAR=1: indexa los PDFs y termina (útil en Colab; no pide clave del modelo)
-SOLO_INDEXAR = os.environ.get("SOLO_INDEXAR") == "1"
+#
+# Importar este archivo no hace nada más que definir funciones y valores: quien vaya a buscar
+# llama a preparar(), y quien vaya a pedir respuestas a la nube, antes a comprobar_clave().
 
+import os
 import re
 import hashlib
 from pathlib import Path
 
 import numpy as np
-import chromadb
 import pdfplumber
 from pypdf import PdfReader
-from sentence_transformers import SentenceTransformer
+
+# SOLO_INDEXAR=1: indexa los PDFs y termina (útil en Colab; no pide clave del modelo)
+SOLO_INDEXAR = os.environ.get("SOLO_INDEXAR") == "1"
 
 
 # ---------------------------------------------------------------
@@ -37,9 +37,6 @@ MODELOS = {
 # La variable de entorno NEUROCLERK_MODELO permite usar otro modelo sin editar este archivo
 MODELO_LLM = os.environ.get("NEUROCLERK_MODELO") or MODELOS[PROVEEDOR]
 _VARIABLES = {"gemini": "GEMINI_API_KEY", "groq": "GROQ_API_KEY"}
-if not SOLO_INDEXAR and PROVEEDOR in _VARIABLES and not os.environ.get(_VARIABLES[PROVEEDOR]):
-    raise SystemExit(f"Falta la clave de {PROVEEDOR}: define la variable de entorno "
-                     f"{_VARIABLES[PROVEEDOR]} (ver README), o pon PROVEEDOR = \"ollama\".")
 MAX_TOKENS_RESPUESTA = 700 if PROVEEDOR == "ollama" else 2000   # los de la nube cuentan su razonamiento
 
 MODELO_EMBEDDINGS = "intfloat/multilingual-e5-base"   # lee hasta ~300 palabras
@@ -60,6 +57,13 @@ CARPETA_DB = "chroma_db"       # aquí ChromaDB guarda los vectores en disco
 # e5 necesita estos prefijos para distinguir documentos de preguntas
 PREFIJO_DOC = "passage: "
 PREFIJO_PREGUNTA = "query: "
+
+
+def comprobar_clave():
+    """Avisa antes de indexar o buscar si falta la clave del proveedor en la nube."""
+    if PROVEEDOR in _VARIABLES and not os.environ.get(_VARIABLES[PROVEEDOR]):
+        raise SystemExit(f"Falta la clave de {PROVEEDOR}: define la variable de entorno "
+                         f"{_VARIABLES[PROVEEDOR]} (ver README), o pon PROVEEDOR = \"ollama\".")
 
 
 # ---------------------------------------------------------------
@@ -197,16 +201,17 @@ def dividir_en_chunks(paginas, tam=TAM_CHUNK, solape=SOLAPE):
 # ---------------------------------------------------------------
 # 3) PREPARAR: abrir ChromaDB y procesar solo los PDFs que falten
 # ---------------------------------------------------------------
-modelo_emb = SentenceTransformer(MODELO_EMBEDDINGS)
-
 # Si cambias el modelo de embeddings o el tamaño de los chunks, los vectores viejos
 # ya no sirven. Por eso el nombre de la colección depende de esa configuración:
 # al cambiarla se crea una colección nueva y se recalcula todo automáticamente.
 config = f"{MODELO_EMBEDDINGS}|{TAM_CHUNK}|{SOLAPE}|{VERSION_TEXTO}"
 nombre_coleccion = "rag_" + hashlib.md5(config.encode()).hexdigest()[:10]
 
-cliente = chromadb.PersistentClient(path=CARPETA_DB)
-coleccion = cliente.get_or_create_collection(nombre_coleccion)
+# Los completa preparar()
+modelo_emb = None
+coleccion = None
+archivos = []
+CUPO = {}
 
 
 def huella(ruta):
@@ -245,39 +250,56 @@ def indexar_pdf(ruta):
     print(f"  {len(chunks)} fragmentos guardados")
 
 
-pdfs = sorted(Path(CARPETA_DATOS).glob("*.pdf"))
-if not pdfs:
-    raise SystemExit(f"No encontré PDFs dentro de la carpeta '{CARPETA_DATOS}'.")
+def preparar():
+    """Carga el modelo de embeddings, abre ChromaDB e indexa lo que falte en "datos".
 
-for ruta in pdfs:
-    guardado = coleccion.get(where={"archivo": ruta.name}, limit=1, include=["metadatas"])
-    if guardado["ids"] and guardado["metadatas"][0].get("huella") == huella(ruta):
-        print(f"Ya indexado: {ruta.name}")
-        continue
-    if guardado["ids"]:
-        print(f"{ruta.name} cambió: borrando sus vectores viejos...")
-        coleccion.delete(where={"archivo": ruta.name})
-    print(f"Indexando {ruta.name} (solo esta vez)...")
-    indexar_pdf(ruta)
+    También quita de la base los PDFs que ya no estén en "datos". Se puede llamar varias
+    veces: después de la primera no hace nada."""
+    global modelo_emb, coleccion, archivos, CUPO
+    if coleccion is not None:
+        return
 
-# Los PDFs que quitaste de la carpeta "datos" también se quitan de la base
-nombres_actuales = {r.name for r in pdfs}
-todos = coleccion.get(include=["metadatas"])
-for archivo in {m["archivo"] for m in todos["metadatas"]} - nombres_actuales:
-    print(f"Quitando {archivo} (ya no está en '{CARPETA_DATOS}')")
-    coleccion.delete(where={"archivo": archivo})
+    # Usa el modelo ya descargado. Para descargarlo (primera vez, o en Colab): HF_HUB_OFFLINE=0
+    # Tiene que definirse antes de importar sentence_transformers, que la lee al importarse.
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    import chromadb
+    from sentence_transformers import SentenceTransformer
 
-archivos = sorted(nombres_actuales)
+    modelo_emb = SentenceTransformer(MODELO_EMBEDDINGS)
+    cliente = chromadb.PersistentClient(path=CARPETA_DB)
+    coleccion = cliente.get_or_create_collection(nombre_coleccion)
 
-# Cuántos fragmentos tiene cada documento: los grandes reciben más candidatos en la búsqueda
-_tamanos = {}
-for m in coleccion.get(include=["metadatas"])["metadatas"]:
-    _tamanos[m["archivo"]] = _tamanos.get(m["archivo"], 0) + 1
-CUPO = {a: max(K_MIN, min(K_MAX, round(_tamanos.get(a, 0) / FRAGMENTOS_POR_CANDIDATO)))
-        for a in archivos}
-print(f"Base lista: {coleccion.count()} fragmentos de {len(archivos)} archivos.")
-if SOLO_INDEXAR:
-    raise SystemExit("Indexación terminada (SOLO_INDEXAR=1).")
+    pdfs = sorted(Path(CARPETA_DATOS).glob("*.pdf"))
+    if not pdfs:
+        raise SystemExit(f"No encontré PDFs dentro de la carpeta '{CARPETA_DATOS}'.")
+
+    for ruta in pdfs:
+        guardado = coleccion.get(where={"archivo": ruta.name}, limit=1, include=["metadatas"])
+        if guardado["ids"] and guardado["metadatas"][0].get("huella") == huella(ruta):
+            print(f"Ya indexado: {ruta.name}")
+            continue
+        if guardado["ids"]:
+            print(f"{ruta.name} cambió: borrando sus vectores viejos...")
+            coleccion.delete(where={"archivo": ruta.name})
+        print(f"Indexando {ruta.name} (solo esta vez)...")
+        indexar_pdf(ruta)
+
+    # Los PDFs que quitaste de la carpeta "datos" también se quitan de la base
+    nombres_actuales = {r.name for r in pdfs}
+    todos = coleccion.get(include=["metadatas"])
+    for archivo in {m["archivo"] for m in todos["metadatas"]} - nombres_actuales:
+        print(f"Quitando {archivo} (ya no está en '{CARPETA_DATOS}')")
+        coleccion.delete(where={"archivo": archivo})
+
+    archivos = sorted(nombres_actuales)
+
+    # Cuántos fragmentos tiene cada documento: los grandes reciben más candidatos en la búsqueda
+    tamanos = {}
+    for m in coleccion.get(include=["metadatas"])["metadatas"]:
+        tamanos[m["archivo"]] = tamanos.get(m["archivo"], 0) + 1
+    CUPO = {a: max(K_MIN, min(K_MAX, round(tamanos.get(a, 0) / FRAGMENTOS_POR_CANDIDATO)))
+            for a in archivos}
+    print(f"Base lista: {coleccion.count()} fragmentos de {len(archivos)} archivos.")
 
 
 # ---------------------------------------------------------------
@@ -454,6 +476,12 @@ def generar(prompt):
 # 6) PROGRAMA PRINCIPAL: hacer preguntas hasta escribir "salir"
 # ---------------------------------------------------------------
 if __name__ == "__main__":
+    if SOLO_INDEXAR:
+        preparar()
+        print("Indexación terminada (SOLO_INDEXAR=1).")
+        raise SystemExit
+    comprobar_clave()
+    preparar()
     print(f"Listo (modelo: {MODELO_LLM} en {PROVEEDOR}). Escribe tu pregunta (o 'salir' para terminar).")
     while True:
         pregunta = input("\nPregunta: ").strip()

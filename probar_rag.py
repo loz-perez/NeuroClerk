@@ -36,7 +36,7 @@ if "--modelo" in sys.argv:
 else:
     os.environ.setdefault("NEUROCLERK_MODELO", MODELO_PRUEBAS)
 
-import rag   # al importarlo se abre ChromaDB y se indexa lo que falte
+import rag
 
 LIBRO = "Interacciones_Farmacologicas_SEFH.pdf"
 
@@ -265,6 +265,9 @@ def ranking(pregunta, archivo):
 
 
 def main():
+    if "--llm" in sys.argv:
+        rag.comprobar_clave()
+    rag.preparar()   # abre ChromaDB e indexa lo que falte
     if "--ranking" in sys.argv:
         i = sys.argv.index("--ranking")
         if len(sys.argv) <= i + 2:

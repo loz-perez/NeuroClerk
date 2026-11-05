@@ -390,7 +390,7 @@ def responder(pregunta):
 
     print("\nGenerando respuesta...", flush=True)
     partes = []
-    for trozo in generar(prompt):        # la respuesta llega de a poco (streaming)
+    for trozo in generar(prompt):
         partes.append(trozo)
         print(".", end="", flush=True)   # un punto por trozo: se ve que avanza
     print()
@@ -409,13 +409,22 @@ NUBE = {
 _cliente = None
 
 
+def _aviso_de_corte(motivo):
+    """Una respuesta incompleta no se muestra: una lista de fármacos cortada parece completa."""
+    return (f"[La respuesta quedó incompleta (motivo: {motivo or 'el proveedor no lo indicó'}) "
+            "y no se muestra. Vuelve a preguntar.]")
+
+
 def generar(prompt):
-    """Devuelve la respuesta del modelo en trozos de texto, sea local o en la nube."""
+    """Devuelve la respuesta del modelo en trozos de texto, sea local o en la nube.
+
+    Solo entrega una respuesta si el modelo confirma que terminó; si no, un aviso entre corchetes."""
     mensajes = [{"role": "user", "content": prompt}]
 
     if PROVEEDOR == "ollama":
         import ollama
         extra = {"think": False} if MODELO_LLM.startswith("qwen3") else {}
+        partes, motivo = [], None
         for trozo in ollama.chat(
             model=MODELO_LLM,
             messages=mensajes,
@@ -423,7 +432,9 @@ def generar(prompt):
             stream=True,
             **extra,
         ):
-            yield trozo["message"]["content"]
+            partes.append(trozo["message"]["content"])
+            motivo = trozo.get("done_reason") or motivo   # solo viene en el último trozo
+        yield "".join(partes) if motivo == "stop" else _aviso_de_corte(motivo)
         return
 
     global _cliente
@@ -437,7 +448,8 @@ def generar(prompt):
         _cliente = OpenAI(base_url=url, api_key=clave)
 
     extra = {"reasoning_effort": "low"} if PROVEEDOR == "groq" else {}
-    # Errores pasajeros (servidor saturado, 503, cortes de red): se reintenta hasta 3 veces
+    # Errores pasajeros (servidor saturado, 503, cortes de red): se reintenta hasta 3 veces.
+    # Sin streaming: el de Gemini a veces se cierra a mitad de respuesta y sin indicar el motivo.
     for intento in range(4):
         try:
             respuesta = _cliente.chat.completions.create(
@@ -445,13 +457,22 @@ def generar(prompt):
                 messages=mensajes,
                 temperature=0.1,
                 max_tokens=MAX_TOKENS_RESPUESTA,
-                stream=True,
                 **extra,
             )
-            for trozo in respuesta:
-                if trozo.choices and trozo.choices[0].delta.content:
-                    yield trozo.choices[0].delta.content
-            return
+            eleccion = respuesta.choices[0] if respuesta.choices else None
+            motivo = eleccion.finish_reason if eleccion else None
+            if motivo == "stop" and eleccion.message.content:
+                yield eleccion.message.content
+                return
+            if motivo and motivo != "stop":   # límite de tokens o filtro: reintentar daría lo mismo
+                yield _aviso_de_corte(motivo)
+                return
+            if intento == 3:
+                yield _aviso_de_corte(motivo)
+                return
+            espera = 2 ** (intento + 1)   # 2, 4 y 8 segundos
+            print(f"\n  (la respuesta llegó incompleta; reintento en {espera} s)", flush=True)
+            time.sleep(espera)
         except RateLimitError:
             # Límite por minuto: suele bastar con esperar. Si se repite, es el cupo diario.
             if intento < 2:

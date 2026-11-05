@@ -10,7 +10,7 @@
 import sys
 import unicodedata
 
-import rag   # al importarlo se abre ChromaDB y se indexa lo que falte
+import rag
 
 ARCHIVO = "Interacciones_Farmacologicas_SEFH.pdf"   # nombre del libro de interacciones en datos/
 
@@ -90,6 +90,9 @@ def es_ficha_valida(fragmento, caso):
 
 def main():
     usar_llm = "--llm" in sys.argv
+    if usar_llm:
+        rag.comprobar_clave()
+    rag.preparar()   # abre ChromaDB e indexa lo que falte
     ok_tabla = ok_fuente = ok_respuesta = errores = 0
 
     # Si el nombre del libro no coincide, todas las pruebas fallarían: mejor avisar ya

@@ -256,7 +256,7 @@ python .\probar_rag.py --buscar litemia FT_Litio.pdf   # busca una palabra en lo
 python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO     # por qué un fragmento llega o no al modelo
 ```
 
-Todos estos comandos importan `rag.py`, así que indexan lo que falte y, con `"gemini"` o `"groq"`, piden la clave del proveedor aunque no llamen al modelo.
+Todos estos comandos indexan lo que falte. Solo `--llm` pide la clave del proveedor, porque es el único que llama al modelo.
 
 Opciones de `--llm`:
 

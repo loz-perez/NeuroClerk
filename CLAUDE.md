@@ -28,7 +28,7 @@ python .\probar_rag.py --buscar PALABRA [ARCHIVO]     # qué fragmentos contiene
 python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO   # qué filtro deja afuera a un fragmento
 
 .venv\Scripts\python.exe probar_rag.py --llm --exportar   # guarda las respuestas en evaluaciones/respuestas.json
-.venv-ragas\Scripts\python.exe evaluar_ragas.py [--limite N] [--pausa S] [--resumen]   # fidelidad y relevancia con Ragas
+.venv-ragas\Scripts\python.exe evaluar_ragas.py [--limite N] [--modelo NOMBRE] [--resumen]   # fidelidad y relevancia con Ragas
 ```
 
 `evaluar_ragas.py` corre siempre en `.venv-ragas` (`requirements-ragas.txt`): Ragas arrastra LangChain y baja `openai` a 1.x, y `rag.py` usa 3.x. No instalarlo en `.venv`, no importarlo desde `rag.py` ni importar `rag.py` desde `evaluar_ragas.py`; se comunican por el JSON. `test_rag.py` importa sus funciones puras, así que Ragas debe seguir importándose solo dentro de `evaluar()`.

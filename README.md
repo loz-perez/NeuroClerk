@@ -319,7 +319,10 @@ py -3.12 -m venv .venv-ragas
 .venv-ragas\Scripts\python.exe evaluar_ragas.py           # las evalúa (gasta cupo)
 .venv-ragas\Scripts\python.exe evaluar_ragas.py --limite 5   # solo 5 evaluaciones nuevas
 .venv-ragas\Scripts\python.exe evaluar_ragas.py --resumen    # muestra lo ya evaluado, sin pedir nada
+.venv-ragas\Scripts\python.exe evaluar_ragas.py --modelo gemini-3.1-flash-lite   # otro evaluador
 ```
+
+El programa envía como máximo 12 peticiones por minuto al modelo, y ante un límite por minuto espera lo que pide el proveedor. Si se agota el cupo diario, se detiene: cada modelo tiene su propio cupo, así que `--modelo` permite seguir, pero los puntajes de evaluadores distintos no son del todo comparables.
 
 Cada resultado se guarda al obtenerlo: si se agota el cupo, volver a correrlo sigue donde quedó. Una respuesta que cambió se vuelve a evaluar. `evaluaciones/` no se sube a Git porque contiene texto de los PDFs.
 

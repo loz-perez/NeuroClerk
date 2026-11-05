@@ -5,6 +5,7 @@
 # No necesitan el modelo de embeddings, ChromaDB, los PDFs de datos/ ni claves, y tardan
 # menos de un segundo. La calidad de la búsqueda y de las respuestas se mide con probar_rag.py.
 
+import asyncio
 import sys
 import time
 from types import SimpleNamespace
@@ -12,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 import rag
-from evaluar_ragas import contextos_de, metricas_de, pendientes, resumir
+from evaluar_ragas import Ritmo, contextos_de, espera_por_limite, metricas_de, pendientes, resumir
 from probar_rag import dosis_sin_respaldo, extraer_dosis, respuesta_ok
 from rag import _parecido, dividir_en_chunks, tabla_a_unidades
 
@@ -339,3 +340,56 @@ def test_generar_con_ollama_revisa_el_motivo_de_cierre(monkeypatch, motivo, espe
     monkeypatch.setitem(sys.modules, "ollama", SimpleNamespace(chat=lambda **parametros: iter(trozos)))
     monkeypatch.setattr(rag, "PROVEEDOR", "ollama")
     assert "".join(rag.generar("p")).startswith(esperado)
+
+
+# ---------------------------------------------------------------
+# evaluar_ragas.py: límites del proveedor
+# ---------------------------------------------------------------
+def test_espera_por_limite_no_espera_si_es_el_cupo_diario():
+    # Fragmento real de un error 429 de Gemini
+    mensaje = ("'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', "
+               "'quotaValue': '500'}]}, {'retryDelay': '75842s'}")
+    assert espera_por_limite(mensaje) is None
+
+
+def test_espera_por_limite_usa_la_demora_que_pide_el_proveedor():
+    assert espera_por_limite("'quotaId': 'GenerateRequestsPerMinute', 'retryDelay': '37s'") == 38
+    assert espera_por_limite('"retryDelay": "37s"') == 38
+
+
+def test_espera_por_limite_sin_demora_espera_un_minuto():
+    assert espera_por_limite("Error code: 429") == 60
+
+
+def peticion(ruta):
+    return SimpleNamespace(url=SimpleNamespace(path=ruta))
+
+
+def test_ritmo_separa_las_peticiones_al_modelo(monkeypatch):
+    esperas = []
+
+    async def dormir(segundos):
+        esperas.append(segundos)
+    monkeypatch.setattr(asyncio, "sleep", dormir)
+    ritmo = Ritmo(12, reloj=lambda: 100.0)   # el reloj no avanza: son peticiones simultáneas
+
+    async def tres():
+        for _ in range(3):
+            await ritmo.esperar(peticion("/v1beta/openai/chat/completions"))
+    asyncio.run(tres())
+    assert esperas == [5.0, 10.0]
+
+
+def test_ritmo_no_frena_los_embeddings(monkeypatch):
+    esperas = []
+
+    async def dormir(segundos):
+        esperas.append(segundos)
+    monkeypatch.setattr(asyncio, "sleep", dormir)
+    ritmo = Ritmo(12, reloj=lambda: 100.0)
+
+    async def dos():
+        for _ in range(2):
+            await ritmo.esperar(peticion("/v1beta/openai/embeddings"))
+    asyncio.run(dos())
+    assert esperas == []

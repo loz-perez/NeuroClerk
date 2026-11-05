@@ -32,7 +32,7 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 | Pruebas | `probar_rag.py` y la planilla `casos_de_prueba_NeuroClerk.xlsx`; `test_rag.py` con pytest para las funciones puras | Medir cada cambio con los mismos casos y guardar el historial; comprobar la lógica en menos de un segundo, sin modelo ni base |
 | Evaluación | Ragas 0.4.3 en `evaluar_ragas.py`, con su propio entorno (`.venv-ragas`) | Mide fidelidad y relevancia; aparte, porque exige LangChain y `openai` 1.x, y así la aplicación sigue sin framework |
 | Interfaz | Terminal; Streamlit en la fase 4 | Para probar sin depender de una interfaz |
-| Control de versiones | Git y GitHub (repositorio privado), una rama por función | Para volver a una versión que funciona si algo se rompe |
+| Control de versiones | Git y GitHub (repositorio público), una rama por función | Para volver a una versión que funciona si algo se rompe |
 
 ## Fases
 
@@ -116,7 +116,7 @@ Las citas por afirmación y las pruebas automáticas cubren buena parte de la re
 | Cero alucinaciones en dosis | Parcial | Responde solo con el contexto, cita cada afirmación, temperatura 0.1; una prueba comprueba que no invente la dosis de un fármaco que no está en los documentos; 9 casos de dosis y un chequeo de que cada dosis de la respuesta esté en los fragmentos | Una regla explícita en el prompt: no dar dosis que no estén textuales en un fragmento citado |
 | Humano en el bucle | Parcial | Muestra los fragmentos usados para verificar cada dato | La revisión y firma de notas llega con la fase 3 |
 | Datos sintéticos | Pendiente | Todavía no se usan datos de pacientes | Escribir los casos ficticios para las fases 2 y 3 |
-| Privacidad | Parcial | La búsqueda es local; los PDFs, la base vectorial y las claves no se suben a Git, y el repositorio es privado; Ollama permite trabajar sin enviar nada fuera | Con Gemini o Groq, la pregunta y los fragmentos salen a la nube: datos de pacientes, solo con Ollama |
+| Privacidad | Parcial | La búsqueda es local; los PDFs, la base vectorial y las claves no se suben a Git, lo que importa porque el repositorio es público; Ollama permite trabajar sin enviar nada fuera | Con Gemini o Groq, la pregunta y los fragmentos salen a la nube: datos de pacientes, solo con Ollama |
 | Derechos de autor | Parcial | Los documentos con licencia (DSM-5-TR, PANSS) quedan solo en la PC | Confirmar la licencia de la YMRS antes de cualquier uso compartido |
 | Aviso de uso | Parcial | Está en el README | Mostrarlo en la interfaz (fase 4) |
 

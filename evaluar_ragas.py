@@ -7,7 +7,8 @@
 #   .venv\Scripts\python.exe probar_rag.py --llm --exportar      -> genera las respuestas
 #   .venv-ragas\Scripts\python.exe evaluar_ragas.py              -> las evalúa
 #   .venv-ragas\Scripts\python.exe evaluar_ragas.py --limite 5   -> solo 5 evaluaciones nuevas
-#   .venv-ragas\Scripts\python.exe evaluar_ragas.py --pausa 15   -> espera entre evaluaciones
+#   .venv-ragas\Scripts\python.exe evaluar_ragas.py --modelo gemini-3.1-flash-lite
+#                                                                -> otro evaluador: cada modelo tiene su cupo
 #   .venv-ragas\Scripts\python.exe evaluar_ragas.py --resumen    -> muestra lo ya evaluado
 #
 # Cada resultado se guarda al obtenerlo: si se agota el cupo, volver a correrlo sigue donde quedó.
@@ -23,6 +24,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -34,7 +36,9 @@ MODELO_EVALUADOR = "gemini-3.5-flash-lite"
 MODELO_EMBEDDINGS = "gemini-embedding-001"
 MAX_TOKENS_EVALUADOR = 4000   # la lista de afirmaciones de una respuesta larga no debe cortarse
 PREGUNTAS_RELEVANCIA = 1      # Ragas usa 3 por defecto: con 1 se gasta menos cupo, pero varía más
-PAUSA = 12                    # segundos entre evaluaciones, por el límite de peticiones por minuto
+PETICIONES_POR_MINUTO = 12    # el plan gratuito permite 15: se deja margen
+INTENTOS = 3                  # por evaluación, ante límites por minuto y servidor saturado
+ESPERA_SERVIDOR = 30          # segundos, cuando el servidor está saturado (503)
 
 # En estos casos lo correcto es no responder, y la relevancia castiga justamente eso
 TIPOS_SIN_RELEVANCIA = ("abstencion", "dosis_ausente")
@@ -87,6 +91,35 @@ def guardar(resultados):
     temporal.replace(ARCHIVO_RESULTADOS)   # si algo se corta al escribir, el archivo anterior sigue entero
 
 
+class Ritmo:
+    """Separa las peticiones al modelo, para no pasar del límite por minuto.
+
+    Actúa en cada petición HTTP porque una evaluación hace varias, y Ragas puede sumar reintentos.
+    Los embeddings no cuentan: tienen un límite propio mucho más alto."""
+
+    def __init__(self, por_minuto, reloj=None):
+        self.intervalo = 60 / por_minuto
+        self.reloj = reloj
+        self.proxima = 0.0
+
+    async def esperar(self, peticion):
+        if not peticion.url.path.endswith("/chat/completions"):
+            return
+        ahora = (self.reloj or asyncio.get_running_loop().time)()
+        turno = max(ahora, self.proxima)
+        self.proxima = turno + self.intervalo
+        if turno > ahora:
+            await asyncio.sleep(turno - ahora)
+
+
+def espera_por_limite(mensaje):
+    """Segundos a esperar tras un error 429, o None si es el cupo diario: esperar no sirve."""
+    if "PerDay" in mensaje:
+        return None
+    pedido = re.search(r"retryDelay\W+(\d+)s", mensaje)
+    return int(pedido.group(1)) + 1 if pedido else 60
+
+
 def mostrar_resumen(casos, resultados):
     print("\n" + "=" * 60)
     for (tipo, metrica), r in sorted(resumir(casos, resultados).items()):
@@ -107,10 +140,10 @@ def mostrar_resumen(casos, resultados):
             print(f"  {valor:.2f}  {pregunta[:80]}")
 
 
-async def evaluar(casos, resultados, limite, pausa):
+async def evaluar(casos, resultados, limite, modelo):
     # Se importa acá para que las funciones de arriba se puedan probar sin Ragas instalado
     os.environ.setdefault("RAGAS_DO_NOT_TRACK", "true")
-    from openai import AsyncOpenAI
+    from openai import AsyncOpenAI, DefaultAsyncHttpxClient, InternalServerError, RateLimitError
     from ragas.embeddings import OpenAIEmbeddings
     from ragas.llms import llm_factory
     from ragas.metrics.collections import AnswerRelevancy, Faithfulness
@@ -118,30 +151,50 @@ async def evaluar(casos, resultados, limite, pausa):
     clave = os.environ.get("GEMINI_API_KEY")
     if not clave:
         raise SystemExit("Falta la clave: define la variable de entorno GEMINI_API_KEY (ver README).")
-    cliente = AsyncOpenAI(base_url=URL_GEMINI, api_key=clave)
-    llm = llm_factory(MODELO_EVALUADOR, client=cliente, max_tokens=MAX_TOKENS_EVALUADOR)
+    ritmo = Ritmo(PETICIONES_POR_MINUTO)
+    # max_retries=0: los reintentos los decide el bucle de abajo, según qué límite se alcanzó
+    cliente = AsyncOpenAI(base_url=URL_GEMINI, api_key=clave, max_retries=0,
+                          http_client=DefaultAsyncHttpxClient(event_hooks={"request": [ritmo.esperar]}))
+    llm = llm_factory(modelo, client=cliente, max_tokens=MAX_TOKENS_EVALUADOR)
     fidelidad = Faithfulness(llm=llm)
     relevancia = AnswerRelevancy(llm=llm, embeddings=OpenAIEmbeddings(client=cliente, model=MODELO_EMBEDDINGS),
                                  strictness=PREGUNTAS_RELEVANCIA)
 
+    async def medir(caso, metrica):
+        if metrica == "fidelidad":
+            return await fidelidad.ascore(user_input=caso["pregunta"], response=caso["respuesta"],
+                                          retrieved_contexts=contextos_de(caso))
+        return await relevancia.ascore(user_input=caso["pregunta"], response=caso["respuesta"])
+
     faltan = pendientes(casos, resultados)
-    print(f"{len(faltan)} evaluaciones pendientes.")
+    print(f"{len(faltan)} evaluaciones pendientes (evaluador: {modelo}).")
     errores_seguidos = 0
     for n, (caso, metrica) in enumerate(faltan[:limite] if limite else faltan, start=1):
-        if n > 1 and pausa:
-            await asyncio.sleep(pausa)
         print(f"[{n}] {metrica}: {caso['pregunta'][:70]}", flush=True)
-        try:
-            if metrica == "fidelidad":
-                r = await fidelidad.ascore(user_input=caso["pregunta"], response=caso["respuesta"],
-                                           retrieved_contexts=contextos_de(caso))
-            else:
-                r = await relevancia.ascore(user_input=caso["pregunta"], response=caso["respuesta"])
-        except Exception as e:   # un error del proveedor no debe perder lo ya evaluado
-            print(f"    ERROR {type(e).__name__}: {str(e)[:150]}")
+        r = None
+        for intento in range(INTENTOS):
+            try:
+                r = await medir(caso, metrica)
+                break
+            except RateLimitError as e:
+                espera = espera_por_limite(str(e))
+                if espera is None:
+                    print(f"Se agotó el cupo diario de {modelo}. Vuelve a correrlo cuando se renueve, "
+                          "o usa otro modelo con --modelo: sigue donde quedó.")
+                    return
+                print(f"    límite por minuto; espero {espera} s", flush=True)
+            except InternalServerError:
+                espera = ESPERA_SERVIDOR
+                print(f"    servidor saturado; espero {espera} s", flush=True)
+            except Exception as e:   # un error inesperado no debe perder lo ya evaluado
+                print(f"    ERROR {type(e).__name__}: {str(e)[:500]}")
+                break
+            if intento < INTENTOS - 1:
+                await asyncio.sleep(espera)
+        if r is None:
             errores_seguidos += 1
             if errores_seguidos == 2:
-                print("El proveedor falló dos veces seguidas: probablemente se agotó el cupo. "
+                print("Dos evaluaciones seguidas sin resultado: lo detengo. "
                       "Vuelve a correrlo más tarde: sigue donde quedó.")
                 break
             continue
@@ -167,8 +220,8 @@ def main():
 
     if "--resumen" not in sys.argv:
         limite = int(sys.argv[sys.argv.index("--limite") + 1]) if "--limite" in sys.argv else None
-        pausa = float(sys.argv[sys.argv.index("--pausa") + 1]) if "--pausa" in sys.argv else PAUSA
-        asyncio.run(evaluar(casos, resultados, limite, pausa))
+        modelo = sys.argv[sys.argv.index("--modelo") + 1] if "--modelo" in sys.argv else MODELO_EVALUADOR
+        asyncio.run(evaluar(casos, resultados, limite, modelo))
     mostrar_resumen(casos, resultados)
 
 

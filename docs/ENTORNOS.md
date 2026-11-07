@@ -101,14 +101,14 @@ cd ~/neuroclerk
 
 | Prueba | Resultado |
 | --- | --- |
-| `pytest` | 111 pasan, 1 xfail |
+| `pytest` | 129 pasan, 1 xfail |
 | `probar_rag.py` (búsqueda) | tabla 7/7, fuente 17/17, dosis 9/9 |
 | `probar_rag.py --llm` (28 casos) | 16/17 respuestas (caso 13 inestable), 2/2 abstenciones, 9/9 dosis, 9/9 respaldo |
 | Regla de dosis y cupo 12 | 9/9 dosis y 9/9 respaldo; 14/17 y 2/2 sin cambios |
 | Reindexación GPU (61 PDFs) | 11,2 min y 13.864 fragmentos |
 | Consulta de combinación (fluoxetina + tramadol) | aviso con los dos fármacos y respuesta con citas |
 | SOAP (5 notas ficticias) | 5/5 secciones, datos, examen mental y análisis con `gemma3:4b` |
-| `banco.py correr` | corrida #1: tabla 7/7, fuente 17/17, dosis 9/9, contexto 21/23 |
+| `banco.py correr` | corrida #6: tabla 7/7, fuente 17/17, dosis 9/9, contexto 23/23 |
 | Ollama `gemma3:4b` | consulta de litio en 35 s, con citas; 45/55 % CPU/GPU |
 | Gemini | la misma consulta en 17 s, con citas |
 

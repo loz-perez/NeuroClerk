@@ -1,6 +1,6 @@
 # NeuroClerk
 
-NeuroClerk es un asistente para psiquiatría que responde consultas sobre interacciones farmacológicas y, en una próxima versión, ayudará a estructurar notas de evolución. Usa RAG: responde solo con la información de documentos de referencia, como el DSM-5-TR o fichas técnicas, y cita el archivo y la página de cada dato, para que cualquier respuesta se pueda verificar en la fuente. La búsqueda funciona siempre en equipos propios; la respuesta la puede redactar un modelo local o uno gratuito en la nube.
+NeuroClerk es un asistente para psiquiatría que responde consultas sobre interacciones farmacológicas y estructura notas de evolución en formato SOAP. Usa RAG: responde solo con la información de documentos de referencia, como el DSM-5-TR o fichas técnicas, y cita el archivo y la página de cada dato, para que cualquier respuesta se pueda verificar en la fuente. La búsqueda funciona siempre en equipos propios; la respuesta la puede redactar un modelo local o uno gratuito en la nube.
 
 El estado de cada fase y los próximos pasos están en [HOJA_DE_RUTA.md](HOJA_DE_RUTA.md).
 
@@ -18,9 +18,9 @@ flowchart LR
     C --> D
     D --> E["Embeddings<br/>multilingual-e5-base"]
     E --> F[("ChromaDB<br/>chroma_db/")]
-    P["Pregunta"] --> G["Buscar candidatos<br/>3 a 15 por archivo"]
+    P["Pregunta"] --> G["Buscar candidatos<br/>12 a 15 por archivo"]
     F --> G
-    G --> H["Filtrar por similitud<br/>margen 0.03, máx. 12"]
+    G --> H["Filtrar por similitud<br/>margen 0.03, máx. 12 + 2 continuaciones"]
     H --> I["Prompt con reglas<br/>y citas"]
     I --> J["Modelo de lenguaje<br/>Gemini, Groq u Ollama"]
     J --> R["Respuesta citada"]
@@ -94,7 +94,7 @@ python -m pip install --upgrade pip setuptools wheel
 pip install -r requirements-lock.txt
 
 # 3. Solo si vas a usar el modelo local
-ollama pull qwen3:8b
+ollama pull gemma3:4b
 ```
 
 Si `requirements-lock.txt` falla, instala desde las librerías principales:
@@ -131,7 +131,7 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
 
 ### Por qué PyTorch CPU
 
-PyTorch solo calcula los embeddings, y gracias a ChromaDB eso pesa únicamente al indexar. La respuesta la genera el modelo de lenguaje, que no depende de PyTorch. La versión CPU pesa ~200 MB frente a más de 2 GB, y no depende de tener una tarjeta NVIDIA. Para indexar rápido, usa Colab (ver [Indexar en la nube](#indexar-en-la-nube-colab)).
+PyTorch solo calcula los embeddings, y gracias a ChromaDB eso pesa únicamente al indexar. La respuesta la genera el modelo de lenguaje, que no depende de PyTorch. La versión CPU pesa ~200 MB frente a más de 2 GB, y no depende de tener una tarjeta NVIDIA. Para indexar rápido, usa Colab o WSL con GPU (ver [Indexar en la nube](#indexar-en-la-nube-colab)). En este equipo, el `.venv` de WSL tiene `torch 2.14.1+cu126` para reindexar; el lock sigue en CPU (ver [docs/ENTORNOS.md](docs/ENTORNOS.md)).
 
 ## Modelo de lenguaje: local o en la nube
 
@@ -293,7 +293,7 @@ Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la
 
 ## Pruebas
 
-`test_rag.py` comprueba con pytest las funciones puras: `dividir_en_chunks`, `tabla_a_unidades` y `_parecido`. No necesita el modelo, la base, los PDFs ni claves, y tarda menos de un segundo:
+`pytest` comprueba las funciones puras de `rag.py` (`dividir_en_chunks`, `tabla_a_unidades`, `_parecido`), de `banco.py` y de `soap.py`. No necesita el modelo, la base, los PDFs ni claves, y tarda menos de dos segundos:
 
 ```powershell
 python -m pytest
@@ -429,7 +429,7 @@ Los PDFs no se suben al repositorio por su tamaño y por derechos de autor.
 | Palabras cortadas ("tem- poral") | OCR del DSM-5-TR | Expresión regular que une las palabras al cargar |
 | Las tablas nunca se encontraban | pypdf las aplana en una lista de nombres sin título, partida en varios fragmentos | Extraerlas con `pdfplumber` como fragmentos propios con el título delante |
 | Las tablas largas con columnas no se encontraban | Se partían en trozos que mezclaban filas, y se juntaban columnas como *Sustratos* e *Inhibidores* | Un fragmento por fila, uno por categoría, y título heredado en las continuaciones |
-| Los libros grandes perdían frente a las fichas | Cada archivo aportaba 3 candidatos, tuviera 10 páginas o 367 | Cupo proporcional al tamaño: de 3 a 15 candidatos |
+| Los libros grandes perdían frente a las fichas | Cada archivo aportaba 3 candidatos, tuviera 10 páginas o 367 | Cupo proporcional al tamaño: de 12 a 15 candidatos |
 | El dato estaba en la página siguiente | Las tablas y frases se cortan al cambiar de página y la siguiente no entraba al contexto | Se suman hasta 2 fragmentos de la página siguiente a los tres mejores |
 
 ### Calidad de la respuesta

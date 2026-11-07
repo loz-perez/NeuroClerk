@@ -30,7 +30,7 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 | Lectura de PDFs | pypdf (texto) y pdfplumber (tablas por filas y categorías) | pypdf convierte las tablas en listas sin título que la búsqueda no encuentra |
 | Indexación | Local, en Google Colab con GPU o en WSL con GPU | En CPU tarda decenas de minutos; en esta máquina, WSL con GPU tardó 11,2 min |
 | Pruebas | `probar_rag.py` y la planilla `casos_de_prueba_NeuroClerk.xlsx`; `test_rag.py` con pytest para las funciones puras | Medir cada cambio con los mismos casos y guardar el historial; comprobar la lógica en menos de un segundo, sin modelo ni base |
-| Evaluación | Ragas 0.4.3 en `evaluar_ragas.py`, con su propio entorno (`.venv-ragas`) | Mide fidelidad y relevancia; aparte, porque exige LangChain y `openai` 1.x, y así la aplicación sigue sin framework |
+| Evaluación | Ragas 0.4.3 en `evaluar_ragas.py`, con su propio entorno (`.venv-ragas`) | Mide fidelidad y relevancia; aparte, porque exige LangChain y su propio stack de `openai`, y así la aplicación sigue sin framework |
 | Interfaz | Terminal; Streamlit en la fase 4 | Para probar sin depender de una interfaz |
 | Control de versiones | Git y GitHub (repositorio público), una rama por función | Para volver a una versión que funciona si algo se rompe |
 | Entorno | Windows + VS Code Remote-WSL; ejecución en Ubuntu 26.04 (WSL2) | La edición queda en Windows y la ejecución pesada en Linux; ver `docs/ENTORNOS.md` |
@@ -63,7 +63,7 @@ Hecho:
 - Tablas extraídas con pdfplumber: un fragmento por fila, uno por categoría (*Sustratos*, *Inhibidores*, *Inductores*) y título heredado en las continuaciones.
 - Limpieza del texto escaneado (palabras cortadas con guion).
 - Modelo en la nube (Gemini o Groq) sin streaming, porque el de Gemini a veces se cierra a mitad de respuesta y sin indicar el motivo, con reintentos automáticos ante errores pasajeros, límites de uso y respuestas incompletas. Una respuesta sin confirmación de que terminó no se muestra.
-- Indexación en Colab con GPU, con huella por contenido para reutilizar la base en la PC.
+- Indexación en Colab o WSL con GPU, con huella por contenido para reutilizar la base en la PC.
 - Pruebas automáticas con `probar_rag.py`: 28 casos sobre tablas de interacciones, fichas técnicas, criterios del DSM-5-TR, la CIE-11, la guía mhGAP, el Formulario, las escalas, un caso clínico, dos preguntas en las que debe abstenerse y 9 casos de dosis.
   - Antes de medir, `--verificar` comprueba que cada palabra clave esté en su fuente.
   - Para diagnosticar un fallo, `--buscar` y `--ranking` muestran qué fragmentos existen y cuál de los filtros los deja afuera.
@@ -116,21 +116,22 @@ Las citas por afirmación y las pruebas automáticas cubren buena parte de la re
 | Regla | Estado | Qué hay hoy | Qué falta |
 | --- | --- | --- | --- |
 | Cero alucinaciones en dosis | Parcial | Responde solo con el contexto, cita cada afirmación, temperatura 0.1; una prueba comprueba que no invente la dosis de un fármaco que no está en los documentos; 9 casos de dosis y un chequeo de que cada dosis de la respuesta esté en los fragmentos. Desde el 07/11/2026 el prompt exige que la dosis esté textual y para ese uso | Sin pendientes: 9/9 en dosis y 9/9 de respaldo (07/11/2026) |
-| Humano en el bucle | Parcial | Muestra los fragmentos usados para verificar cada dato | La revisión y firma de notas llega con la fase 3 |
-| Datos sintéticos | Pendiente | Todavía no se usan datos de pacientes | Escribir los casos ficticios para las fases 2 y 3 |
+| Humano en el bucle | Parcial | Muestra los fragmentos usados para verificar cada dato | La firma visible en la interfaz llega con la fase 4 |
+| Datos sintéticos | Parcial | 5 notas ficticias en `pruebas/`, fuera de `datos/` | Faltan casos de pacientes para probar la interfaz |
 | Privacidad | Parcial | La búsqueda es local; los PDFs, la base vectorial y las claves no se suben a Git, lo que importa porque el repositorio es público; Ollama permite trabajar sin enviar nada fuera | Con Gemini o Groq, la pregunta y los fragmentos salen a la nube: datos de pacientes, solo con Ollama |
 | Derechos de autor | Parcial | Los documentos con licencia (DSM-5-TR, PANSS) quedan solo en la PC | Confirmar la licencia de la YMRS antes de cualquier uso compartido |
 | Aviso de uso | Parcial | Está en el README | Mostrarlo en la interfaz (fase 4) |
 
 ## Próximos pasos
 
-Primero se cierra la fase 2 con los casos que fallan y las reglas de seguridad, y después se empieza la documentación clínica.
+La fase 3 ya está hecha; queda estabilizar el caso 13 y construir la interfaz.
 
 - [x] Un fragmento por fila en las tablas con columnas.
-- [x] Pruebas de referencia sobre todos los tipos de documento: 19 casos en `probar_rag.py`, con la planilla de resultados.
+- [x] Pruebas de referencia sobre todos los tipos de documento: 28 casos en `probar_rag.py`, con la planilla de resultados.
 - [x] Límite de fragmentos por página y filtro de casi duplicados.
 - [x] Medir el tope de 12 fragmentos y la pregunta nueva de la CIE-11.
-- [x] Resolver los casos de la CIE-11, el PHQ-9 y la mhGAP (07/11/2026).
+- [x] Resolver los casos de la CIE-11 y el PHQ-9 (07/11/2026).
+- [ ] Estabilizar el caso 13 (mhGAP), que sigue inestable.
 - [ ] Corregir `_parecido`: devuelve 0.0 con dos textos idénticos, así que no los descarta como duplicados. Hay una prueba marcada como `xfail` en `test_rag.py`; al corregirlo, quitar la marca y volver a medir.
 - [x] Casos de prueba de dosis y línea de base: 7/9, respaldo 7/7.
 - [x] Evaluación con Ragas (fidelidad y relevancia) en un entorno aparte.

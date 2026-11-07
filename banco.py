@@ -282,7 +282,7 @@ def correr(args):
     try:
         configuraciones = expandir_ajustes(args.set)
     except ValueError as e:
-        raise SystemExit(str(e))
+        raise SystemExit(str(e)) from e
     if args.llm and len(configuraciones) > 1:
         raise SystemExit(f"--llm con {len(configuraciones)} combinaciones gastaría {len(configuraciones) * 28} "
                          "peticiones: mide la búsqueda primero y usa --llm con la mejor.")

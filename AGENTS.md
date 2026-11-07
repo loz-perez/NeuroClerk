@@ -19,7 +19,8 @@ Este archivo es para el agente DSH que trabaja en NeuroClerk. `CLAUDE.md` sigue 
 cd ~/neuroclerk
 
 .venv/bin/python rag.py                 # consulta interactiva; indexa lo que falte
-.venv/bin/python -m pytest              # pruebas unitarias
+.venv/bin/python -m pytest              # unitarias + arquitectura
+uvx ruff check .                       # estilo, imports y bugs simples
 .venv/bin/python probar_rag.py --verificar
 .venv/bin/python probar_rag.py          # búsqueda, 28 casos
 .venv/bin/python probar_rag.py --llm    # respuestas, gasta cupo
@@ -34,13 +35,14 @@ cd ~/neuroclerk
 
 - Rama canónica: `feature/entorno-wsl`.
 - Base: 13.864 fragmentos de 61 PDFs; reindexación completa en GPU en ~11,4 min.
-- `pytest`: 129 pasan, 1 xfail (`_parecido` con textos idénticos).
+- `pytest`: 133 pasan, 1 xfail (`_parecido` con textos idénticos).
 - Búsqueda: 7/7 tablas, 17/17 fuentes, 9/9 fuentes de dosis.
 - Respuestas: 16/17; el caso 13 (mhGAP) es inestable con `gemini-3.5-flash-lite`.
 - Dosis: 9/9; respaldo 9/9.
 - SOAP: 5/5 notas con secciones, datos, examen mental y análisis.
 - Fases: 1 ✅, 2 🔵 casi completa por el caso 13, 3 ✅, 4 ⚪ pendiente.
 - Ragas: pendiente de recalcular con las respuestas nuevas.
+- Ruff: `uvx ruff check .` pasa; reglas en `docs/ARQUITECTURA.md`.
 - El registro corto de pendientes está en `TODO.md`.
 
 ## Arquitectura

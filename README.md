@@ -45,6 +45,7 @@ NeuroClerk/
 ├── pruebas/               # notas clínicas ficticias, no se indexan
 ├── docs/ENTORNOS.md       # cómo está montado Windows + WSL
 ├── docs/PLUGINS.md        # plugins de DSH que usa el proyecto
+├── docs/ARQUITECTURA.md   # capas, dependencias y reglas de código
 ├── .vscode/               # intérprete y tareas para Remote-WSL
 ├── rag.py                 # el programa completo
 ├── probar_rag.py          # pruebas de búsqueda y respuesta
@@ -52,6 +53,7 @@ NeuroClerk/
 ├── test_rag.py            # pruebas unitarias de las funciones puras (pytest)
 ├── test_banco.py          # pruebas de banco.py (pytest)
 ├── test_soap.py           # pruebas de soap.py (pytest)
+├── test_arquitectura.py   # reglas de imports entre módulos (pytest)
 ├── probar_soap.py         # mide las cinco notas ficticias con Ollama
 ├── banco.py               # compara configuraciones de la búsqueda
 ├── panel.py               # panel web de las corridas del banco
@@ -61,6 +63,7 @@ NeuroClerk/
 ├── revisar_datos.py       # revisa la carpeta datos/ antes de indexar
 ├── fuentes.csv            # registro de los documentos de datos/
 ├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
+├── pyproject.toml         # configuración de Ruff
 ├── requirements.txt       # librerías principales
 ├── requirements-lock.txt  # versiones exactas del entorno
 ├── requirements-ragas.txt # librerías de .venv-ragas
@@ -296,11 +299,13 @@ Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la
 
 ## Pruebas
 
-`pytest` comprueba las funciones puras de `rag.py` (`dividir_en_chunks`, `tabla_a_unidades`, `_parecido`), de `banco.py` y de `soap.py`. No necesita el modelo, la base, los PDFs ni claves, y tarda menos de dos segundos:
+`pytest` comprueba las funciones puras de `rag.py` (`dividir_en_chunks`, `tabla_a_unidades`, `_parecido`), de `banco.py` y de `soap.py`, más las reglas de imports de `test_arquitectura.py`. No necesita el modelo, la base, los PDFs ni claves, y tarda menos de dos segundos:
 
 ```powershell
 python -m pytest
 ```
+
+`uvx ruff check .` revisa estilo, imports y bugs simples. Está configurado en `pyproject.toml`; las reglas de arquitectura están en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 
 `probar_rag.py` comprueba con 28 preguntas, de todos los tipos de documento, que la búsqueda encuentra las fuentes correctas y que el modelo las usa. Los casos también están en `casos_de_prueba_NeuroClerk.xlsx`, donde se anotan los resultados de cada ejecución.
 

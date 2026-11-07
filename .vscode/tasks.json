@@ -41,6 +41,18 @@
             "problemMatcher": []
         },
         {
+            "label": "Ruff",
+            "detail": "Estilo, imports y bugs simples",
+            "type": "shell",
+            "command": "uvx",
+            "args": [
+                "ruff",
+                "check",
+                "."
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "Verificar casos",
             "detail": "Comprueba que los 28 casos estén bien armados",
             "type": "shell",

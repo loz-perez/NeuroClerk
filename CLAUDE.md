@@ -17,7 +17,8 @@ El repositorio canónico vive en WSL (`~/neuroclerk`); la copia de Windows es un
 .venv/bin/python revisar_datos.py       # revisa datos/ antes de indexar
 .venv/bin/python descargar_fichas.py    # descarga de CIMA las fichas que falten
 
-.venv/bin/python -m pytest              # pruebas unitarias (test_rag.py y test_banco.py)
+.venv/bin/python -m pytest              # tests unitarios + arquitectura
+uvx ruff check .                       # estilo, imports y bugs simples
 .venv/bin/python -m pytest test_rag.py::test_parecido_es_la_proporcion_de_palabras_compartidas
 
 .venv/bin/python probar_rag.py --verificar
@@ -36,7 +37,7 @@ El repositorio canónico vive en WSL (`~/neuroclerk`); la copia de Windows es un
 
 `evaluar_ragas.py` corre siempre en `.venv-ragas` (`requirements-ragas.txt`): Ragas arrastra LangChain y su propio stack de `openai`, distinto del de `rag.py`. No instalarlo en `.venv`, no importarlo desde `rag.py` ni importar `rag.py` desde `evaluar_ragas.py`; se comunican por el JSON. `test_rag.py` importa sus funciones puras, así que Ragas debe seguir importándose solo dentro de `evaluar()`. Cada evaluador guarda sus puntajes por separado: el de por defecto en `evaluaciones/ragas.json` y los demás en `evaluaciones/ragas_MODELO.json`.
 
-`test_rag.py`, `test_banco.py` y `test_soap.py` corren sin el modelo, la base, los PDFs ni claves. `probar_rag.py` mide la búsqueda y las respuestas, necesita `datos/` y `chroma_db/`, que no están en Git, y no tiene una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. No hay linter ni CI.
+`test_rag.py`, `test_banco.py`, `test_soap.py` y `test_arquitectura.py` corren sin el modelo, la base, los PDFs ni claves. `probar_rag.py` mide la búsqueda y las respuestas, necesita `datos/` y `chroma_db/`, que no están en Git, y no tiene una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. Ruff revisa estilo e imports; no hay CI todavía.
 
 Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (cambia el modelo sin editar el código), `SOLO_INDEXAR=1` (indexa y termina), `HF_HUB_OFFLINE=0` (permite descargar el modelo de embeddings; por defecto `rag.py` trabaja sin conexión).
 
@@ -45,6 +46,8 @@ Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (ca
 `soap.py` estructura notas clínicas ficticias en SOAP y Examen del Estado Mental. Importarlo no tiene efectos; `estructurar()` exige `PROVEEDOR = "ollama"` salvo que se pase `permitir_nube=True` (solo para las notas de `pruebas/`). Las notas nunca van a `datos/`.
 
 Para leer una página puntual de un PDF del corpus, usar `read_document`; para recuperar una decisión anterior, `session_search`. Los plugins de DSH viven en el perfil `~/.dsh/profiles/desktop`, no en el repositorio; ver `docs/PLUGINS.md`.
+
+Las reglas de capas, dependencias y código limpio están en `docs/ARQUITECTURA.md`; `test_arquitectura.py` las comprueba.
 
 `rag.py` es el programa completo y está organizado en bloques numerados: 0 configuración, 1 carga de PDF (`pypdf`) y tablas (`pdfplumber`), 2 división, 3 indexación en ChromaDB, 4 `recuperar()`, 5 `responder()` y `generar()`, 6 bucle interactivo. Los parámetros se cambian en el bloque 0.
 

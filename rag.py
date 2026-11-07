@@ -8,9 +8,9 @@
 # Importar este archivo no hace nada más que definir funciones y valores: quien vaya a buscar
 # llama a preparar(), y quien vaya a pedir respuestas a la nube, antes a comprobar_clave().
 
+import hashlib
 import os
 import re
-import hashlib
 import unicodedata
 from pathlib import Path
 
@@ -386,7 +386,7 @@ def continuaciones(elegidos, v, mejor):
             )
         except Exception:
             continue   # una página que no existe o un filtro que Chroma no acepta no frena la búsqueda
-        for texto, meta, emb in zip(r["documents"], r["metadatas"], r["embeddings"]):
+        for texto, _meta, emb in zip(r["documents"], r["metadatas"], r["embeddings"]):
             if (archivo, pagina) in usadas or any(
                     c["archivo"] == archivo and int(c["pagina"]) == pagina for c in elegidos):
                 continue
@@ -600,7 +600,8 @@ def generar(prompt):
 
     global _cliente
     import time
-    from openai import OpenAI, RateLimitError, InternalServerError, APIConnectionError, APITimeoutError
+
+    from openai import APIConnectionError, APITimeoutError, InternalServerError, OpenAI, RateLimitError
     if _cliente is None:
         url, variable = NUBE[PROVEEDOR]
         clave = os.environ.get(variable)

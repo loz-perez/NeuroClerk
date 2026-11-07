@@ -14,11 +14,27 @@ from types import SimpleNamespace
 import pytest
 
 import rag
-from evaluar_ragas import (MODELO_EVALUADOR, Ritmo, archivo_resultados, contextos_de, espera_por_limite,
-                           guardar, metricas_de, pendientes, resumir)
+from evaluar_ragas import (
+    MODELO_EVALUADOR,
+    Ritmo,
+    archivo_resultados,
+    contextos_de,
+    espera_por_limite,
+    guardar,
+    metricas_de,
+    pendientes,
+    resumir,
+)
 from probar_rag import dosis_sin_respaldo, extraer_dosis, respuesta_ok
-from rag import (_parecido, advertencia_de_combinacion, dividir_en_chunks, farmacos_mencionados,
-                 paginas_siguientes, tabla_a_unidades, unir_tablas_partidas)
+from rag import (
+    _parecido,
+    advertencia_de_combinacion,
+    dividir_en_chunks,
+    farmacos_mencionados,
+    paginas_siguientes,
+    tabla_a_unidades,
+    unir_tablas_partidas,
+)
 
 
 def pagina(texto, numero=1):

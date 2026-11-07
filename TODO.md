@@ -33,11 +33,11 @@ Registro corto de tareas pendientes. El contexto de cada fase está en `HOJA_DE_
 - [ ] **Guías de GuíaSalud y NICE**, si aportan respuestas que hoy no están cubiertas.
 - [ ] **Comparar el RAG propio con un framework** (LlamaIndex o LangChain), solo como evaluación, sin reemplazar el código actual.
 - [ ] **Revisar licencias** de YMRS y PANSS antes de cualquier uso compartido.
-- [ ] **Evaluar CI** para correr `pytest` en cada push; hoy no hay linter ni CI.
+- [ ] **Evaluar CI** para correr `pytest` y `ruff check` en cada push; hoy no hay CI.
 
 ## Estado de partida
 
-- 129 tests pasan, 1 xfail.
+- 133 tests pasan, 1 xfail.
 - Búsqueda: 7/7 tablas, 17/17 fuentes, 9/9 fuentes de dosis.
 - Respuestas: 16/17; el único fallo es el caso 13.
 - Dosis: 9/9; respaldo 9/9.

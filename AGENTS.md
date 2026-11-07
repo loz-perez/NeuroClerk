@@ -62,6 +62,7 @@ uvx ruff check .                       # estilo, imports y bugs simples
 5. `evaluaciones/` contiene texto de PDFs y está fuera de Git.
 6. Mantener los commits en español y con el resultado de las pruebas.
 7. Antes de borrar algo del proyecto, comprobar que no lo usan los tests, la documentación ni las tareas de VS Code.
+8. **Modelo fijo de pruebas:** usar siempre `gemini-3.5-flash-lite` (`MODELO_PRUEBAS`). No mezclar modelos en una misma tanda. Si se agota el cupo, esperar el reinicio; si se evalúa Gemini 3.1, correr la tanda completa con ese modelo y dejarlo anotado.
 
 ## Herramientas de DSH
 

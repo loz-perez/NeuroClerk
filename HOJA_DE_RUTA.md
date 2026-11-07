@@ -1,15 +1,15 @@
 # Hoja de ruta de NeuroClerk
 
-*Actualizada el 5 de noviembre de 2026.*
+*Actualizada el 7 de noviembre de 2026.*
 
-NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 14 de 17, más 2 de 2 abstenciones y 7 de 9 casos de dosis. Para cerrar la fase 2 faltan tres casos que fallan (dos de búsqueda y uno del modelo), la regla de seguridad sobre dosis y el flujo de advertencias; después vienen el módulo de notas clínicas y la interfaz web.
+NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 14 de 17, más 2 de 2 abstenciones y 7 de 9 casos de dosis. Para cerrar la fase 2 faltan los tres casos que fallan (dos de búsqueda y uno del modelo), dos casos de dosis y el flujo de advertencias; la regla de dosis ya está en el prompt; después vienen el módulo de notas clínicas y la interfaz web.
 
 ## De un vistazo
 
 | Fase | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Entorno y fundamentos de RAG | ✅ Completada |
-| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: respuestas 14/17, faltan la regla de dosis y las advertencias |
+| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: respuestas 14/17, faltan dos casos de dosis y las advertencias |
 | 3 | Módulo de documentación clínica (notas SOAP) | ⚪ Pendiente |
 | 4 | Interfaz y pruebas con usuarios | ⚪ Pendiente |
 

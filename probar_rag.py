@@ -62,7 +62,7 @@ ARCHIVO_EXPORTACION = Path("evaluaciones/respuestas.json")   # fuera de Git: con
 #   prohibido  lo que la respuesta NO debe contener (en abstención y dosis ausente)
 #   aviso      frases que dejan claro que el uso no se recomienda (basta una; en dosis ausente)
 CASOS = [
-    # --- Tablas del libro de interacciones (los 7 casos de probar_tablas.py) ---
+    # --- Tablas del libro de interacciones (7 casos) ---
     {"tipo": "tabla", "grupo": "Interacciones (tabla)",
      "pregunta": "¿Qué fármacos pueden causar síndrome neuroléptico maligno?",
      "tabla": (9, "Tabla 1. Fármacos que pueden causar Síndrome Neuroléptico Maligno"),

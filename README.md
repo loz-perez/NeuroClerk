@@ -50,7 +50,6 @@ NeuroClerk/
 ├── .vscode/               # intérprete y tareas para Remote-WSL
 ├── rag.py                 # el programa completo
 ├── probar_rag.py          # pruebas de búsqueda y respuesta
-├── probar_tablas.py       # prueba anterior; sus 7 casos están en probar_rag.py
 ├── test_rag.py            # pruebas unitarias de las funciones puras (pytest)
 ├── test_banco.py          # pruebas de banco.py (pytest)
 ├── test_soap.py           # pruebas de soap.py (pytest)

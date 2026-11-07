@@ -15,7 +15,6 @@ Registro corto de tareas pendientes. El contexto de cada fase está en `HOJA_DE_
 - [ ] **Revisar documentos en inglés.** Con preguntas en español casi no llegan al contexto; decidir si se traducen, se descartan o se indexan aparte.
 - [ ] **Vigilar la abstención ocasional del caso 12.** La pág. 504 está en el contexto y el caso pasó 5/5 al repetirlo; en una corrida el modelo dijo que no alcanzaba. No reproducido.
 - [ ] **Revisar el límite por página.** En la tabla de inhibidores del CYP2D6, la continuación queda afuera; evaluar si `MAX_POR_PAGINA=2` corta listas largas.
-- [ ] **Decidir qué hacer con `probar_tablas.py`.** Sus 7 casos ya están en `probar_rag.py`; si se elimina, actualizar README y CLAUDE.
 - [ ] **Mantener el Historial.** Cada corrida con `--llm` debe quedar en la hoja *Historial* y en el mensaje del commit.
 
 ## Entorno e infraestructura

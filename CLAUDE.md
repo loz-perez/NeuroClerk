@@ -73,8 +73,6 @@ Las reglas de capas, dependencias y código limpio están en `docs/ARQUITECTURA.
 - Los casos de tabla comparan la página y el comienzo del texto del fragmento con el título esperado, así que cambiar el formato de los fragmentos de tabla afecta esos casos.
 - `probar_rag.py` fija `NEUROCLERK_MODELO` antes de importar `rag` y usa por defecto `gemini-3.5-flash-lite`, aunque `PROVEEDOR` sea otro. Con Groq u Ollama hay que pasar `--modelo`.
 
-`probar_tablas.py` es la prueba anterior: sus 7 casos ya están dentro de `probar_rag.py`, que es la que se usa.
-
 ## Reglas del proyecto
 
 - **Después de cambiar la extracción o la búsqueda:** volver a correr las pruebas y anotar el resultado en la hoja *Historial* de `casos_de_prueba_NeuroClerk.xlsx` y en el mensaje del commit.

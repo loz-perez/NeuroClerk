@@ -31,7 +31,6 @@ Este documento fija las reglas para que el RAG siga siendo entendible y para que
 | `banco.py` | `rag`, `probar_rag` |
 | `panel.py` | `banco` |
 | `probar_soap.py` | `rag`, `soap` |
-| `probar_tablas.py` | `rag` |
 | `evaluar_ragas.py` | ninguno |
 | `descargar_fichas.py`, `revisar_datos.py` | ninguno |
 

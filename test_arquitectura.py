@@ -7,7 +7,7 @@ cruzado, este test obliga a actualizar docs/ARQUITECTURA.md y esta tabla.
 import ast
 from pathlib import Path
 
-MODULOS = {"rag", "soap", "banco", "panel", "probar_rag", "probar_soap", "probar_tablas", "evaluar_ragas"}
+MODULOS = {"rag", "soap", "banco", "panel", "probar_rag", "probar_soap", "evaluar_ragas"}
 
 PERMITIDOS = {
     "rag.py": set(),
@@ -16,7 +16,6 @@ PERMITIDOS = {
     "banco.py": {"rag", "probar_rag"},
     "panel.py": {"banco"},
     "probar_soap.py": {"rag", "soap"},
-    "probar_tablas.py": {"rag"},
     "evaluar_ragas.py": set(),
     "descargar_fichas.py": set(),
     "revisar_datos.py": set(),

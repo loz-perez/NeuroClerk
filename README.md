@@ -245,7 +245,7 @@ Todo se ajusta en el bloque 0 de `rag.py`:
 | `TAM_CHUNK` | `200` | Palabras por fragmento |
 | `SOLAPE` | `40` | Palabras repetidas entre fragmentos seguidos |
 | `K_MIN`, `K_MAX` | `12`, `15` | Candidatos que se buscan en cada PDF: 12 en una ficha corta, hasta 15 en un libro |
-| `FRAGMENTOS_POR_CANDIDATO` | `100` | Un candidato más por cada 100 fragmentos del documento |
+| `FRAGMENTOS_POR_CANDIDATO` | `100` | 12 candidatos como mínimo; uno más por cada 100 fragmentos, hasta 15 |
 | `MARGEN` | `0.03` | Se descartan los fragmentos que quedan más de esto por debajo del mejor |
 | `MAX_FRAGMENTOS` | `12` | Tope de fragmentos que llegan al modelo |
 | `MAX_POR_PAGINA` | `2` | Tope de fragmentos de una misma página, para que una tabla con muchas filas no ocupe todo el contexto |

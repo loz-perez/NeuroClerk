@@ -47,6 +47,8 @@ K_MIN, K_MAX = 12, 15          # candidatos por PDF: 12 en una ficha corta, hast
 FRAGMENTOS_POR_CANDIDATO = 100 # un candidato más por cada 100 fragmentos del documento
 MARGEN = 0.03                  # se descarta lo que esté a más de esto del mejor fragmento
 MAX_FRAGMENTOS = 12            # tope de fragmentos que llegan al modelo
+MAX_CONTINUACIONES = 2         # fragmentos extra de la página siguiente a los mejores
+MARGEN_CONTINUACION = 0.05     # cuánto puede caer una continuación respecto del mejor
 MAX_POR_PAGINA = 2             # tope de fragmentos de una misma página (evita que una tabla copa todo)
 SIMILITUD_DUPLICADO = 0.5      # dos fragmentos de una página que comparten más de esto de sus palabras
                                # son casi el mismo texto (p. ej. un cuadro leído como texto y como tabla)
@@ -362,6 +364,42 @@ def preparar():
 
 
 # ---------------------------------------------------------------
+# 3b) CONTINUACIONES: lo que sigue en la página siguiente
+# ---------------------------------------------------------------
+def paginas_siguientes(elegidos):
+    """Las páginas que siguen a los tres mejores fragmentos, sin repetir."""
+    return sorted({(c["archivo"], int(c["pagina"]) + 1) for c in elegidos[:3]})
+
+
+def continuaciones(elegidos, v, mejor):
+    """Fragmentos de la página siguiente a los mejores, para no perder tablas o frases partidas.
+
+    Se agregan al final y como máximo dos; el resto del contexto no cambia. Una continuación
+    puede quedar algo por debajo del mejor fragmento, porque la página siguiente suele repetir
+    el encabezado o continuar una tabla."""
+    extra, usadas = [], set()
+    for archivo, pagina in paginas_siguientes(elegidos):
+        try:
+            r = coleccion.get(
+                where={"$and": [{"archivo": archivo}, {"pagina": pagina}]},
+                include=["documents", "metadatas", "embeddings"],
+            )
+        except Exception:
+            continue   # una página que no existe o un filtro que Chroma no acepta no frena la búsqueda
+        for texto, meta, emb in zip(r["documents"], r["metadatas"], r["embeddings"]):
+            if (archivo, pagina) in usadas or any(
+                    c["archivo"] == archivo and int(c["pagina"]) == pagina for c in elegidos):
+                continue
+            similitud = float(np.dot(emb, v))
+            if similitud < mejor - MARGEN_CONTINUACION:
+                continue
+            usadas.add((archivo, pagina))
+            extra.append({"archivo": archivo, "pagina": pagina, "texto": texto, "similitud": similitud})
+    extra.sort(key=lambda c: c["similitud"], reverse=True)
+    return extra[:MAX_CONTINUACIONES]
+
+
+# ---------------------------------------------------------------
 # 4) RECUPERAR: los fragmentos más parecidos, de CADA archivo,
 #    descartando los que se parecen mucho menos que el mejor
 # ---------------------------------------------------------------
@@ -405,7 +443,8 @@ def recuperar(pregunta, k_por_archivo=None, margen=MARGEN, max_total=MAX_FRAGMEN
             continue
         por_pagina[clave] = por_pagina.get(clave, 0) + 1
         elegidos.append(c)
-    return elegidos[:max_total]
+    elegidos = elegidos[:max_total]
+    return elegidos + continuaciones(elegidos, v, mejor)
 
 
 def _palabras(texto):
@@ -489,6 +528,7 @@ def responder(pregunta):
         "- Una dosis solo vale para el fármaco, la indicación, la edad y la vía que indica el fragmento; no la traslades a otro uso.\n"
         "- Si el contexto no trae la dosis para ese fármaco, esa edad o ese uso, dilo; no la aproximes ni la calcules.\n"
         "- Si la pregunta pide un máximo y el fragmento dice que la dosis puede aumentarse hasta un valor (por ejemplo, 'la dosis inicial es 5 mg y puede aumentarse hasta 10 mg'), ese valor es la dosis máxima: respóndelo con la cita. No respondas que falta la dosis máxima si el fragmento indica ese límite.\n"
+        "- Si la pregunta pide el puntaje máximo de una escala y el fragmento muestra rangos (por ejemplo, '20-27 Severe'), el extremo superior del último rango es el máximo; dilo con la cita.\n"
         "- Si la pregunta combina dos o más fármacos, trátala como consulta de interacción: describe el riesgo, el mecanismo si está en el contexto y qué hacer.\n"
         "- Si el contexto no menciona la interacción entre esos fármacos, dilo expresamente; no afirmes que la combinación es segura.\n"
         "- Si el contexto no alcanza para responder, dilo.\n\n"

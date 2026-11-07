@@ -2,14 +2,14 @@
 
 *Actualizada el 7 de noviembre de 2026.*
 
-NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 14 de 17, más 2 de 2 abstenciones y 9 de 9 casos de dosis. Para cerrar la fase 2 faltan los tres casos que fallan (dos de búsqueda y uno del modelo); después vienen el módulo de notas clínicas y la interfaz web.
+NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 17 de 17, más 2 de 2 abstenciones y 9 de 9 casos de dosis. La fase 2 queda cerrada; después vienen el módulo de notas clínicas y la interfaz web.
 
 ## De un vistazo
 
 | Fase | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Entorno y fundamentos de RAG | ✅ Completada |
-| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: respuestas 14/17, faltan los tres casos de búsqueda/modelo |
+| 2 | Consulta farmacológica con RAG | ✅ Completada: 17/17, 2/2 y 9/9 |
 | 3 | Módulo de documentación clínica (notas SOAP) | ⚪ Pendiente |
 | 4 | Interfaz y pruebas con usuarios | ⚪ Pendiente |
 
@@ -58,6 +58,7 @@ Hecho:
   - Descarta los casi duplicados de una misma página, como un recuadro leído como texto y como tabla.
   - Hasta 12 fragmentos por pregunta.
 - Prompt con reglas: citar después de cada afirmación, no agregar nada fuera del contexto e incluir todas las fuentes relevantes; temperatura 0.1.
+- Continuaciones: hasta 2 fragmentos de la página siguiente a los tres mejores, para no perder tablas o frases partidas.
 - Aviso destacado de combinación cuando la pregunta menciona dos fármacos del corpus, con la regla de no afirmar que la combinación es segura sin cita.
 - Tablas extraídas con pdfplumber: un fragmento por fila, uno por categoría (*Sustratos*, *Inhibidores*, *Inductores*) y título heredado en las continuaciones.
 - Limpieza del texto escaneado (palabras cortadas con guion).
@@ -78,15 +79,12 @@ Evolución de las pruebas:
 | Migración a WSL; tablas partidas y banco de pruebas | 7/7 | 17/17 | 14/17 | 2/2 |
 | Regla de dosis en el prompt | 7/7 | 17/17 | 14/17 | 2/2 |
 | Cupo mínimo 12 y regla de dosis máxima en el prompt | 7/7 | 17/17 | 14/17 | 2/2 |
+| Continuaciones de página y regla de puntaje máximo | 7/7 | 17/17 | 17/17 | 2/2 |
 
-El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales; el cupo 12 y la regla de máximo llevaron las dosis a 9/9 y el respaldo a 9/9.
+El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales; el cupo 12 y la regla de máximo llevaron las dosis a 9/9 y el respaldo a 9/9. Las continuaciones de página y la regla de puntaje máximo cerraron los tres casos que fallaban: 17/17.
 
 Falta:
 
-- Resolver los tres casos que siguen fallando:
-  - **CIE-11 (búsqueda):** la página 504, con la equivalencia de la esquizofrenia, no llega al contexto, ni siquiera con la pregunta reformulada.
-  - **PHQ-9 (búsqueda):** llega solo la página 1 del cuestionario; el 27 aparece únicamente en la página 2 ("20-27 Severe").
-  - **mhGAP (modelo):** con el tope de 12 ya llega el Cuadro 1 de antidepresivos (página 37, puesto 5), pero el modelo responde que el contexto no alcanza.
 - Documentos en inglés: con preguntas en español casi no llegan al contexto. Dos documentos sobre zolpidem que se probaron y se quitaron no aparecieron en ninguno de los 28 casos, y es posible que a la tabla de Flockhart le pase lo mismo.
 - Revisar si el límite por página corta listas largas: en la tabla de inhibidores del CYP2D6, la continuación queda afuera.
 
@@ -128,7 +126,7 @@ Primero se cierra la fase 2 con los casos que fallan y las reglas de seguridad, 
 - [x] Pruebas de referencia sobre todos los tipos de documento: 19 casos en `probar_rag.py`, con la planilla de resultados.
 - [x] Límite de fragmentos por página y filtro de casi duplicados.
 - [x] Medir el tope de 12 fragmentos y la pregunta nueva de la CIE-11.
-- [ ] Resolver los casos de la CIE-11, el PHQ-9 y la mhGAP.
+- [x] Resolver los casos de la CIE-11, el PHQ-9 y la mhGAP (07/11/2026).
 - [ ] Corregir `_parecido`: devuelve 0.0 con dos textos idénticos, así que no los descarta como duplicados. Hay una prueba marcada como `xfail` en `test_rag.py`; al corregirlo, quitar la marca y volver a medir.
 - [x] Casos de prueba de dosis y línea de base: 7/9, respaldo 7/7.
 - [x] Evaluación con Ragas (fidelidad y relevancia) en un entorno aparte.

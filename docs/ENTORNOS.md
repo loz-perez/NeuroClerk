@@ -103,7 +103,7 @@ cd ~/neuroclerk
 | --- | --- |
 | `pytest` | 111 pasan, 1 xfail |
 | `probar_rag.py` (búsqueda) | tabla 7/7, fuente 17/17, dosis 9/9 |
-| `probar_rag.py --llm` (28 casos) | 14/17 respuestas, 2/2 abstenciones, 9/9 dosis, 9/9 respaldo |
+| `probar_rag.py --llm` (28 casos) | 17/17 respuestas, 2/2 abstenciones, 9/9 dosis, 9/9 respaldo |
 | Regla de dosis y cupo 12 | 9/9 dosis y 9/9 respaldo; 14/17 y 2/2 sin cambios |
 | Consulta de combinación (fluoxetina + tramadol) | aviso con los dos fármacos y respuesta con citas |
 | `banco.py correr` | corrida #1: tabla 7/7, fuente 17/17, dosis 9/9, contexto 21/23 |

@@ -18,7 +18,7 @@ from evaluar_ragas import (MODELO_EVALUADOR, Ritmo, archivo_resultados, contexto
                            guardar, metricas_de, pendientes, resumir)
 from probar_rag import dosis_sin_respaldo, extraer_dosis, respuesta_ok
 from rag import (_parecido, advertencia_de_combinacion, dividir_en_chunks, farmacos_mencionados,
-                 tabla_a_unidades, unir_tablas_partidas)
+                 paginas_siguientes, tabla_a_unidades, unir_tablas_partidas)
 
 
 def pagina(texto, numero=1):
@@ -379,6 +379,23 @@ def test_resumen_promedia_por_tipo_y_cuenta_los_sin_valor():
 def test_resumen_ignora_resultados_de_una_respuesta_anterior():
     resultados = {"¿P?": {"respuesta": "Vieja", "metricas": {"fidelidad": 1.0}}}
     assert resumir([caso_ragas()], resultados) == {}
+
+
+# ---------------------------------------------------------------
+# continuación de páginas
+# ---------------------------------------------------------------
+def test_paginas_siguientes_solo_de_los_tres_primeros():
+    elegidos = [
+        {"archivo": "a.pdf", "pagina": 3},
+        {"archivo": "a.pdf", "pagina": 7},
+        {"archivo": "b.pdf", "pagina": 1},
+        {"archivo": "c.pdf", "pagina": 9},
+    ]
+    assert paginas_siguientes(elegidos) == [("a.pdf", 4), ("a.pdf", 8), ("b.pdf", 2)]
+
+
+def test_paginas_siguientes_sin_fragmentos_no_devuelve_nada():
+    assert paginas_siguientes([]) == []
 
 
 # ---------------------------------------------------------------

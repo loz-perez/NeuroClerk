@@ -17,7 +17,8 @@ import rag
 from evaluar_ragas import (MODELO_EVALUADOR, Ritmo, archivo_resultados, contextos_de, espera_por_limite,
                            guardar, metricas_de, pendientes, resumir)
 from probar_rag import dosis_sin_respaldo, extraer_dosis, respuesta_ok
-from rag import _parecido, dividir_en_chunks, tabla_a_unidades, unir_tablas_partidas
+from rag import (_parecido, advertencia_de_combinacion, dividir_en_chunks, farmacos_mencionados,
+                 tabla_a_unidades, unir_tablas_partidas)
 
 
 def pagina(texto, numero=1):
@@ -378,6 +379,49 @@ def test_resumen_promedia_por_tipo_y_cuenta_los_sin_valor():
 def test_resumen_ignora_resultados_de_una_respuesta_anterior():
     resultados = {"¿P?": {"respuesta": "Vieja", "metricas": {"fidelidad": 1.0}}}
     assert resumir([caso_ragas()], resultados) == {}
+
+
+# ---------------------------------------------------------------
+# aviso de combinación
+# ---------------------------------------------------------------
+ARCHIVOS_CON_FARMACOS = ["FT_Fluoxetina.pdf", "FT_Tramadol.pdf", "FT_Litio.pdf", "DSM-5-TR.pdf"]
+
+
+def test_farmacos_mencionados_encuentra_los_dos():
+    assert farmacos_mencionados("Toma FLUOXETINA, ¿puedo añadir Tramadol?", ARCHIVOS_CON_FARMACOS) == [
+        "fluoxetina", "tramadol"]
+
+
+def test_farmacos_mencionados_no_confunde_litemia_con_litio():
+    assert farmacos_mencionados("La litemia es de 0,8 mEq/l", ARCHIVOS_CON_FARMACOS) == []
+
+
+def test_advertencia_solo_aparece_con_dos_farmacos():
+    assert advertencia_de_combinacion("¿Puedo añadir tramadol a la fluoxetina?", ARCHIVOS_CON_FARMACOS)
+    assert advertencia_de_combinacion("¿Qué es la fluoxetina?", ARCHIVOS_CON_FARMACOS) is None
+
+
+def test_advertencia_nombra_los_farmacos_y_advierte_del_silencio():
+    texto = advertencia_de_combinacion("fluoxetina y tramadol", ARCHIVOS_CON_FARMACOS)
+    assert "fluoxetina" in texto and "tramadol" in texto
+    assert "no significa" in texto.lower()
+
+
+def test_responder_muestra_la_advertencia(monkeypatch, capsys):
+    monkeypatch.setattr(rag, "archivos", ARCHIVOS_CON_FARMACOS)
+    monkeypatch.setattr(rag, "recuperar", lambda pregunta: [])
+    monkeypatch.setattr(rag, "generar", lambda prompt: iter(["ok"]))
+    rag.responder("¿Puedo añadir tramadol a la fluoxetina?")
+    salida = capsys.readouterr().out
+    assert "ADVERTENCIA" in salida and "tramadol" in salida
+
+
+def test_responder_no_muestra_advertencia_con_un_solo_farmaco(monkeypatch, capsys):
+    monkeypatch.setattr(rag, "archivos", ARCHIVOS_CON_FARMACOS)
+    monkeypatch.setattr(rag, "recuperar", lambda pregunta: [])
+    monkeypatch.setattr(rag, "generar", lambda prompt: iter(["ok"]))
+    rag.responder("¿Qué es la fluoxetina?")
+    assert "ADVERTENCIA" not in capsys.readouterr().out
 
 
 # generar: una respuesta sin confirmación de que terminó no se entrega

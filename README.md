@@ -200,6 +200,21 @@ Respuesta:
 ...
 ```
 
+## Consultas de combinación
+
+Si la pregunta menciona dos fármacos del corpus (`FT_*.pdf`), el programa muestra un aviso antes de la respuesta:
+
+```text
+================================================================
+ ADVERTENCIA - CONSULTA DE COMBINACIÓN
+ Fármacos detectados: fluoxetina, tramadol
+ Revisa la interacción en las fuentes citadas antes de indicar.
+ Que el contexto no la mencione no significa que la combinación sea segura.
+================================================================
+```
+
+El aviso no reemplaza la respuesta: el prompt pide describir el riesgo y el mecanismo, y decir expresamente si los fragmentos no mencionan la interacción. Se detectan por el nombre del archivo (`FT_Fluoxetina.pdf`); las clases (por ejemplo, IECA) y las marcas no se reconocen.
+
 ## Indexar en la nube (Colab)
 
 Indexar las ~3.300 páginas en una computadora sin GPU tarda mucho. En Google Colab, con una GPU gratuita, es mucho más rápido.

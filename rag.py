@@ -11,6 +11,7 @@
 import os
 import re
 import hashlib
+import unicodedata
 from pathlib import Path
 
 import numpy as np
@@ -423,10 +424,52 @@ def _parecido(texto_a, texto_b):
 
 
 # ---------------------------------------------------------------
+# 4b) COMBINACIONES: avisar cuando la pregunta menciona dos fármacos
+# ---------------------------------------------------------------
+def _sin_tildes(texto):
+    """Minúsculas y sin tildes, para comparar nombres de fármacos."""
+    texto = unicodedata.normalize("NFD", texto.lower())
+    return "".join(c for c in texto if unicodedata.category(c) != "Mn")
+
+
+def farmacos_mencionados(pregunta, archivos=None):
+    """Los fármacos del corpus (FT_*.pdf) que aparecen como palabra en la pregunta."""
+    nombres = archivos if archivos is not None else globals().get("archivos", [])
+    texto = _sin_tildes(pregunta)
+    hallados = set()
+    for archivo in nombres:
+        if archivo.startswith("FT_") and archivo.endswith(".pdf"):
+            nombre = archivo[3:-4]
+            if re.search(rf"\b{re.escape(_sin_tildes(nombre))}\b", texto):
+                hallados.add(nombre.lower())
+    return sorted(hallados)
+
+
+def advertencia_de_combinacion(pregunta, archivos=None):
+    """Aviso destacado si la pregunta menciona dos o más fármacos del corpus; si no, None."""
+    farmacos = farmacos_mencionados(pregunta, archivos)
+    if len(farmacos) < 2:
+        return None
+    linea = "=" * 64
+    return "\n".join([
+        linea,
+        " ADVERTENCIA - CONSULTA DE COMBINACIÓN",
+        f" Fármacos detectados: {', '.join(farmacos)}",
+        " Revisa la interacción en las fuentes citadas antes de indicar.",
+        " Que el contexto no la mencione no significa que la combinación sea segura.",
+        linea,
+    ])
+
+
+# ---------------------------------------------------------------
 # 5) GENERAR: pedirle al modelo que responda usando ese contexto
 # ---------------------------------------------------------------
 def responder(pregunta):
     encontrados = recuperar(pregunta)
+
+    aviso = advertencia_de_combinacion(pregunta)
+    if aviso:
+        print("\n" + aviso)
 
     print("\nFragmentos usados:")
     for c in encontrados:
@@ -446,9 +489,11 @@ def responder(pregunta):
         "- Una dosis solo vale para el fármaco, la indicación, la edad y la vía que indica el fragmento; no la traslades a otro uso.\n"
         "- Si el contexto no trae la dosis para ese fármaco, esa edad o ese uso, dilo; no la aproximes ni la calcules.\n"
         "- Si la pregunta pide un máximo y el fragmento dice que la dosis puede aumentarse hasta un valor (por ejemplo, 'la dosis inicial es 5 mg y puede aumentarse hasta 10 mg'), ese valor es la dosis máxima: respóndelo con la cita. No respondas que falta la dosis máxima si el fragmento indica ese límite.\n"
+        "- Si la pregunta combina dos o más fármacos, trátala como consulta de interacción: describe el riesgo, el mecanismo si está en el contexto y qué hacer.\n"
+        "- Si el contexto no menciona la interacción entre esos fármacos, dilo expresamente; no afirmes que la combinación es segura.\n"
         "- Si el contexto no alcanza para responder, dilo.\n\n"
         f"Contexto:\n{contexto}\n\nPregunta: {pregunta}\n\n"
-        "Recuerda: si un fragmento dice que la dosis puede aumentarse hasta un valor, ese valor es la dosis máxima y debes responderlo con la cita.\n\n"
+        "Recuerda: si un fragmento dice que la dosis puede aumentarse hasta un valor, ese valor es la dosis máxima y debes responderlo con la cita. Si la pregunta combina fármacos, no afirmes que la combinación es segura sin una cita.\n\n"
         "Respuesta en español:"
     )
 

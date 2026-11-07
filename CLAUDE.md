@@ -69,7 +69,7 @@ Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (ca
 ## Reglas del proyecto
 
 - **Después de cambiar la extracción o la búsqueda:** volver a correr las pruebas y anotar el resultado en la hoja *Historial* de `casos_de_prueba_NeuroClerk.xlsx` y en el mensaje del commit.
-- **Respuestas:** el modelo responde solo con el contexto y cita cada afirmación, con temperatura 0.1. Lo más delicado son las dosis, que no deben inventarse nunca: desde el 07/11/2026 el prompt exige que estén textuales en un fragmento citado, para ese fármaco y ese uso. Los casos de abstención de las pruebas cubren parte de esto.
+- **Respuestas:** el modelo responde solo con el contexto y cita cada afirmación, con temperatura 0.1. Lo más delicado son las dosis, que no deben inventarse nunca: desde el 07/11/2026 el prompt exige que estén textuales en un fragmento citado, para ese fármaco y ese uso. Si la pregunta menciona dos fármacos del corpus, `responder()` muestra una advertencia de combinación y el prompt pide no afirmar que es segura sin cita. Los casos de abstención de las pruebas cubren parte de esto.
 - **Datos de pacientes:** nunca por Gemini ni Groq, solo con `PROVEEDOR = "ollama"`.
 - **`evaluaciones/`:** contiene texto de los PDFs, así que no se sube a Git.
 - **`datos/`:** es la fuente de verdad y todo lo que contiene puede citarse como bibliografía. Las notas y los casos ficticios van en `pruebas/`. No subir los PDFs a Git, por derechos de autor.

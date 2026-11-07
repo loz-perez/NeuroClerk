@@ -233,7 +233,7 @@ Por defecto usa Ollama (`gemma3:4b`): una nota clínica no se envía a Gemini ni
 
 ## Indexar en la nube (Colab)
 
-Indexar las ~3.300 páginas en una computadora sin GPU tarda mucho. En Google Colab, con una GPU gratuita, es mucho más rápido.
+Indexar las ~3.300 páginas en una computadora sin GPU tarda mucho. En Google Colab, con una GPU gratuita, es mucho más rápido. En esta máquina, WSL con la RTX 3050 reindexó los 61 PDFs en 11,2 min (ver [docs/ENTORNOS.md](docs/ENTORNOS.md)).
 
 1. En tu PC, comprime lo necesario:
 

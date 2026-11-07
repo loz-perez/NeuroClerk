@@ -28,7 +28,7 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 | Embeddings | `intfloat/multilingual-e5-base` | Lee unas 300 palabras por fragmento; MiniLM solo leía unas 80 |
 | Base vectorial | ChromaDB 1.5.9, guardada en disco | Evita recalcular los vectores en cada ejecución |
 | Lectura de PDFs | pypdf (texto) y pdfplumber (tablas por filas y categorías) | pypdf convierte las tablas en listas sin título que la búsqueda no encuentra |
-| Indexación | Local, o en Google Colab con GPU | Indexar ~3.300 páginas en CPU tarda horas |
+| Indexación | Local, en Google Colab con GPU o en WSL con GPU | En CPU tarda decenas de minutos; en esta máquina, WSL con GPU tardó 11,2 min |
 | Pruebas | `probar_rag.py` y la planilla `casos_de_prueba_NeuroClerk.xlsx`; `test_rag.py` con pytest para las funciones puras | Medir cada cambio con los mismos casos y guardar el historial; comprobar la lógica en menos de un segundo, sin modelo ni base |
 | Evaluación | Ragas 0.4.3 en `evaluar_ragas.py`, con su propio entorno (`.venv-ragas`) | Mide fidelidad y relevancia; aparte, porque exige LangChain y `openai` 1.x, y así la aplicación sigue sin framework |
 | Interfaz | Terminal; Streamlit en la fase 4 | Para probar sin depender de una interfaz |

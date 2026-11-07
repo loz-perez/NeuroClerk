@@ -6,3 +6,4 @@ datos/
 chroma_db/
 NeuroClerk.zip
 .pytest_cache/
+chroma_db_*/

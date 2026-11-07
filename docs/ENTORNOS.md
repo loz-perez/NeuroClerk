@@ -105,6 +105,7 @@ cd ~/neuroclerk
 | `probar_rag.py` (búsqueda) | tabla 7/7, fuente 17/17, dosis 9/9 |
 | `probar_rag.py --llm` (28 casos) | 17/17 respuestas, 2/2 abstenciones, 9/9 dosis, 9/9 respaldo |
 | Regla de dosis y cupo 12 | 9/9 dosis y 9/9 respaldo; 14/17 y 2/2 sin cambios |
+| Reindexación GPU (61 PDFs) | 11,2 min y 13.864 fragmentos |
 | Consulta de combinación (fluoxetina + tramadol) | aviso con los dos fármacos y respuesta con citas |
 | SOAP (5 notas ficticias) | 5/5 secciones, datos, examen mental y análisis con `gemma3:4b` |
 | `banco.py correr` | corrida #1: tabla 7/7, fuente 17/17, dosis 9/9, contexto 21/23 |
@@ -112,6 +113,27 @@ cd ~/neuroclerk
 | Gemini | la misma consulta en 17 s, con citas |
 
 Las extensiones de Python, Pylance y debugpy ya están instaladas del lado de WSL.
+
+## Reindexar con GPU en WSL
+
+El 07/11/2026 se instaló `torch 2.14.1+cu126` en `.venv` y se reconstruyó `chroma_db` desde cero. La base CPU anterior quedó en `~/chroma_db_cpu_backup_20261107`.
+
+```bash
+cd ~/neuroclerk
+mv chroma_db ~/chroma_db_cpu_backup_20261107   # solo la primera vez
+HF_HUB_OFFLINE=1 SOLO_INDEXAR=1 .venv/bin/python rag.py
+```
+
+| Medición | Windows CPU | WSL CPU | WSL GPU |
+| --- | --- | --- | --- |
+| Muestra de 109 fragmentos | 15,05 s (7,24 frag/s) | 21,91 s (4,97 frag/s) | 2,39 s (45,7 frag/s) |
+| Embeddings de 13.864 fragmentos | ~32-38 min (estimado) | ~55 min (estimado) | ~6 min |
+| Parseo de los 61 PDFs | — | 4,9 min | 4,9 min |
+| Reindexación completa | ~37-44 min (estimado) | ~60 min (estimado) | **669 s (11,2 min), medido** |
+
+La muestra se armó con dos fragmentos por documento (texto y tabla) y se midió con el mismo lote en los tres entornos. El parseo es el mismo en CPU y GPU; por eso la ganancia de extremo a extremo (3,3-3,8×) es menor que la de los embeddings (6,3×).
+
+El lock sigue con `torch==2.14.1+cpu`: esta máquina quedó con CUDA para reindexar. Para volver al entorno reproducible del lock, reinstalar desde `requirements-lock.txt`; para conservar GPU, anotar el índice `cu126` al reinstalar.
 
 ## Problemas frecuentes
 

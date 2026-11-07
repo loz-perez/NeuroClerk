@@ -103,6 +103,7 @@ cd ~/neuroclerk
 | --- | --- |
 | `pytest` | 111 pasan, 1 xfail |
 | `probar_rag.py` (búsqueda) | tabla 7/7, fuente 17/17, dosis 9/9 |
+| `probar_rag.py --llm` (28 casos) | 14/17 respuestas, 2/2 abstenciones, 7/9 dosis, 7/7 respaldo |
 | `banco.py correr` | corrida #1: tabla 7/7, fuente 17/17, dosis 9/9, contexto 21/23 |
 | Ollama `gemma3:4b` | consulta de litio en 35 s, con citas; 45/55 % CPU/GPU |
 | Gemini | la misma consulta en 17 s, con citas |

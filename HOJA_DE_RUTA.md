@@ -74,8 +74,9 @@ Evolución de las pruebas:
 | Límite de 2 fragmentos por página | 7/7 | 16/17 | 14/17 | 2/2 |
 | Filtro de casi duplicados y caso de la CIE-11 rehecho | 7/7 | 17/17 | 13/17 | 2/2 |
 | Tope de 12 fragmentos, caso de la CIE-11 reformulado, claves ampliadas en el caso clínico y 2 fichas más | 7/7 | 17/17 | 14/17 | 2/2 |
+| Migración a WSL; tablas partidas y banco de pruebas | 7/7 | 17/17 | 14/17 | 2/2 |
 
-El caso que se sumó en la última fila es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba.
+El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales.
 
 Falta:
 

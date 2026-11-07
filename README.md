@@ -298,16 +298,18 @@ Los avisos del proveedor (límite alcanzado, servidor caído, respuesta incomple
 
 Resultados:
 
-| Medida | Línea de base (27/10/2026, 59 documentos) | Última medición (05/11/2026, 61 documentos) |
-| --- | --- | --- |
-| Tabla | 7/7 | 7/7 |
-| Fuente | 16/17 | 17/17 |
-| Respuesta | 12/17 | 14/17 |
-| Abstención | 2/2 | 2/2 |
-| Dosis | — | 7/9 |
-| Respaldo de dosis | — | 7/7 |
+| Medida | Línea de base (27/10/2026, 59 documentos) | Medición anterior (05/11/2026, 61 documentos) | Medición en WSL (07/11/2026, 61 documentos) |
+| --- | --- | --- | --- |
+| Tabla | 7/7 | 7/7 | 7/7 |
+| Fuente | 16/17 | 17/17 | 17/17 |
+| Respuesta | 12/17 | 14/17 | 14/17 |
+| Abstención | 2/2 | 2/2 | 2/2 |
+| Dosis | — | 7/9 | 7/9 |
+| Respaldo de dosis | — | 7/7 | 7/7 |
 
 La medición anterior a la última dio 13/17 en respuesta. El caso que se sumó es el 17, porque se agregaron palabras clave a la prueba, no porque mejorara el sistema. Siguen fallando los casos 12 (CIE-11), 13 (mhGAP) y 16 (PHQ-9).
+
+La corrida del 07/11/2026, ya en WSL, repitió los mismos totales. Los casos que fallan siguen siendo el 12 (CIE-11), el 13 (mhGAP), el 16 (PHQ-9) y los de dosis 22 (escitalopram en mayores de 65) y 24 (lamotrigina con valproato).
 
 El detalle de cada caso y la evolución entre versiones están en la hoja de cálculo. Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas, anota el resultado en la hoja *Historial* y en el mensaje del commit.
 

@@ -217,7 +217,7 @@ class Manejador(BaseHTTPRequestHandler):
         except (KeyError, ValueError):
             self._enviar("Parámetros no válidos", "text/plain", 400)
 
-    def log_message(self, *_args):
+    def log_message(self, format: str, *_args: object) -> None:
         pass   # sin una línea por petición en el registro del servicio
 
 

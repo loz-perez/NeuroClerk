@@ -68,7 +68,8 @@ NeuroClerk/
 ├── DATOS.md               # qué documentos poner en datos/ y dónde conseguirlos
 ├── HOJA_DE_RUTA.md
 ├── README.md
-└── CLAUDE.md              # guía para trabajar en el proyecto con Claude Code
+├── AGENTS.md              # guía para DeepSeek Harness (DSH)
+└── CLAUDE.md              # guía para Claude Code
 ```
 
 ## Entorno híbrido (WSL)

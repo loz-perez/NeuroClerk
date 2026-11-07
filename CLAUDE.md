@@ -28,17 +28,21 @@ El repositorio canónico vive en WSL (`~/neuroclerk`); la copia de Windows es un
 .venv/bin/python probar_rag.py --ranking "PREGUNTA" ARCHIVO
 .venv/bin/python banco.py correr
 .venv/bin/python panel.py               # http://localhost:8765
+.venv/bin/python soap.py pruebas/nota_depresion.txt
+.venv/bin/python probar_soap.py
 
 .venv-ragas/bin/python evaluar_ragas.py [--limite N] [--modelo NOMBRE] [--resumen]
 ```
 
 `evaluar_ragas.py` corre siempre en `.venv-ragas` (`requirements-ragas.txt`): Ragas arrastra LangChain y su propio stack de `openai`, distinto del de `rag.py`. No instalarlo en `.venv`, no importarlo desde `rag.py` ni importar `rag.py` desde `evaluar_ragas.py`; se comunican por el JSON. `test_rag.py` importa sus funciones puras, así que Ragas debe seguir importándose solo dentro de `evaluar()`. Cada evaluador guarda sus puntajes por separado: el de por defecto en `evaluaciones/ragas.json` y los demás en `evaluaciones/ragas_MODELO.json`.
 
-`test_rag.py` y `test_banco.py` corren sin el modelo, la base, los PDFs ni claves. `probar_rag.py` mide la búsqueda y las respuestas, necesita `datos/` y `chroma_db/`, que no están en Git, y no tiene una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. No hay linter ni CI.
+`test_rag.py`, `test_banco.py` y `test_soap.py` corren sin el modelo, la base, los PDFs ni claves. `probar_rag.py` mide la búsqueda y las respuestas, necesita `datos/` y `chroma_db/`, que no están en Git, y no tiene una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. No hay linter ni CI.
 
 Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (cambia el modelo sin editar el código), `SOLO_INDEXAR=1` (indexa y termina), `HF_HUB_OFFLINE=0` (permite descargar el modelo de embeddings; por defecto `rag.py` trabaja sin conexión).
 
 ## Arquitectura
+
+`soap.py` estructura notas clínicas ficticias en SOAP y Examen del Estado Mental. Importarlo no tiene efectos; `estructurar()` exige `PROVEEDOR = "ollama"` salvo que se pase `permitir_nube=True` (solo para las notas de `pruebas/`). Las notas nunca van a `datos/`.
 
 `rag.py` es el programa completo y está organizado en bloques numerados: 0 configuración, 1 carga de PDF (`pypdf`) y tablas (`pdfplumber`), 2 división, 3 indexación en ChromaDB, 4 `recuperar()`, 5 `responder()` y `generar()`, 6 bucle interactivo. Los parámetros se cambian en el bloque 0.
 

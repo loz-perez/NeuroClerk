@@ -106,6 +106,7 @@ cd ~/neuroclerk
 | `probar_rag.py --llm` (28 casos) | 17/17 respuestas, 2/2 abstenciones, 9/9 dosis, 9/9 respaldo |
 | Regla de dosis y cupo 12 | 9/9 dosis y 9/9 respaldo; 14/17 y 2/2 sin cambios |
 | Consulta de combinación (fluoxetina + tramadol) | aviso con los dos fármacos y respuesta con citas |
+| SOAP (5 notas ficticias) | 5/5 secciones, datos, examen mental y análisis con `gemma3:4b` |
 | `banco.py correr` | corrida #1: tabla 7/7, fuente 17/17, dosis 9/9, contexto 21/23 |
 | Ollama `gemma3:4b` | consulta de litio en 35 s, con citas; 45/55 % CPU/GPU |
 | Gemini | la misma consulta en 17 s, con citas |

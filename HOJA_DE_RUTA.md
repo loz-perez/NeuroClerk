@@ -2,7 +2,7 @@
 
 *Actualizada el 7 de noviembre de 2026.*
 
-NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 17 de 17, más 2 de 2 abstenciones y 9 de 9 casos de dosis. La fase 2 queda cerrada; después vienen el módulo de notas clínicas y la interfaz web.
+NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 17 de 17, más 2 de 2 abstenciones y 9 de 9 casos de dosis. La fase 2 queda cerrada y el módulo de notas clínicas también; sigue la interfaz web.
 
 ## De un vistazo
 
@@ -10,7 +10,7 @@ NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 docum
 | --- | --- | --- |
 | 1 | Entorno y fundamentos de RAG | ✅ Completada |
 | 2 | Consulta farmacológica con RAG | ✅ Completada: 17/17, 2/2 y 9/9 |
-| 3 | Módulo de documentación clínica (notas SOAP) | ⚪ Pendiente |
+| 3 | Módulo de documentación clínica (notas SOAP) | ✅ Completada: 5/5 notas |
 | 4 | Interfaz y pruebas con usuarios | ⚪ Pendiente |
 
 La consulta farmacológica va primero porque el RAG es la base del resto del proyecto.
@@ -88,14 +88,16 @@ Falta:
 - Documentos en inglés: con preguntas en español casi no llegan al contexto. Dos documentos sobre zolpidem que se probaron y se quitaron no aparecieron en ninguno de los 28 casos, y es posible que a la tabla de Flockhart le pase lo mismo.
 - Revisar si el límite por página corta listas largas: en la tabla de inhibidores del CYP2D6, la continuación queda afuera.
 
-### Fase 3: Módulo de documentación clínica — pendiente
+### Fase 3: Módulo de documentación clínica — completada
 
-Estructurar una nota de evolución en formato SOAP a partir de texto libre, extrayendo los elementos del Examen del Estado Mental sin inventar síntomas.
+Estructura una nota de evolución en formato SOAP a partir de texto libre, con el Examen del Estado Mental separado y sin inventar síntomas.
 
-- Escribir 5 notas clínicas ficticias para probar, en `pruebas/` y fuera de la carpeta `datos/`.
-- Prompt de sistema para SOAP y Examen del Estado Mental.
-- Puede reutilizar la estructura de `rag.py`, con el modelo local (Ollama) para cualquier nota que se parezca a datos reales.
-- Casos de prueba propios, con el mismo esquema que `probar_rag.py`.
+Hecho:
+- 5 notas clínicas ficticias en `pruebas/`, fuera de `datos/`.
+- `soap.py`: prompt SOAP + Examen del Estado Mental, parser de secciones y uso de Ollama por defecto.
+- `probar_soap.py`: mide secciones, datos clave y examen mental.
+- `test_soap.py`: pruebas del parser y del rechazo a la nube.
+- Resultado con `gemma3:4b`: 5/5 secciones, 5/5 datos, 5/5 exámenes mentales y 5/5 análisis.
 
 ### Fase 4: Interfaz y pruebas — pendiente
 
@@ -132,7 +134,7 @@ Primero se cierra la fase 2 con los casos que fallan y las reglas de seguridad, 
 - [x] Evaluación con Ragas (fidelidad y relevancia) en un entorno aparte.
 - [x] Agregar al prompt la regla de no dar dosis que no estén textuales en un fragmento citado, y medirla (07/11/2026: 7/9, respaldo 7/7).
 - [x] Flujo de advertencias para consultas de combinación de fármacos (07/11/2026).
-- [ ] Escribir los casos clínicos ficticios: pacientes con su medicación, para la consulta farmacológica, y notas en texto libre, para el SOAP.
-- [ ] Fase 3: prompt y módulo de notas SOAP con Examen del Estado Mental.
+- [x] Escribir los casos clínicos ficticios: pacientes con su medicación, para la consulta farmacológica, y notas en texto libre, para el SOAP.
+- [x] Fase 3: prompt y módulo de notas SOAP con Examen del Estado Mental.
 - [ ] Fase 4: interfaz en Streamlit con las dos pestañas y el aviso de uso.
 - [ ] Más adelante: OCR para PDFs escaneados, guías de GuíaSalud y NICE, y comparar el código propio con LlamaIndex o LangChain.

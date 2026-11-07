@@ -42,6 +42,7 @@ NeuroClerk/
 ├── datos/                 # PDFs, no se suben a Git
 ├── chroma_db/             # vectores guardados, no se sube a Git
 ├── evaluaciones/          # respuestas, Ragas y banco.sqlite, no se sube a Git
+├── pruebas/               # notas clínicas ficticias, no se indexan
 ├── docs/ENTORNOS.md       # cómo está montado Windows + WSL
 ├── .vscode/               # intérprete y tareas para Remote-WSL
 ├── rag.py                 # el programa completo
@@ -49,8 +50,11 @@ NeuroClerk/
 ├── probar_tablas.py       # prueba anterior; sus 7 casos están en probar_rag.py
 ├── test_rag.py            # pruebas unitarias de las funciones puras (pytest)
 ├── test_banco.py          # pruebas de banco.py (pytest)
+├── test_soap.py           # pruebas de soap.py (pytest)
+├── probar_soap.py         # mide las cinco notas ficticias con Ollama
 ├── banco.py               # compara configuraciones de la búsqueda
 ├── panel.py               # panel web de las corridas del banco
+├── soap.py                # estructura notas clínicas en SOAP + examen mental
 ├── evaluar_ragas.py       # fidelidad y relevancia con Ragas (entorno aparte)
 ├── descargar_fichas.py    # descarga las fichas técnicas de CIMA
 ├── revisar_datos.py       # revisa la carpeta datos/ antes de indexar
@@ -215,6 +219,18 @@ Si la pregunta menciona dos fármacos del corpus (`FT_*.pdf`), el programa muest
 
 El aviso no reemplaza la respuesta: el prompt pide describir el riesgo y el mecanismo, y decir expresamente si los fragmentos no mencionan la interacción. Se detectan por el nombre del archivo (`FT_Fluoxetina.pdf`); las clases (por ejemplo, IECA) y las marcas no se reconocen.
 
+## Notas clínicas (SOAP)
+
+`soap.py` ordena una nota de evolución en Subjetivo, Objetivo, Análisis, Plan y Examen del Estado Mental. Las cinco notas ficticias están en `pruebas/` (no en `datos/`), así que el RAG no las cita como bibliografía.
+
+```bash
+.venv/bin/python soap.py pruebas/nota_depresion.txt
+.venv/bin/python soap.py --todas --salida evaluaciones/soap
+.venv/bin/python probar_soap.py
+```
+
+Por defecto usa Ollama (`gemma3:4b`): una nota clínica no se envía a Gemini ni Groq. `--nube` existe solo para las notas ficticias. El prompt prohíbe agregar síntomas, medicación o resultados que no estén en la nota; si falta un dato, el modelo escribe “no consta”.
+
 ## Indexar en la nube (Colab)
 
 Indexar las ~3.300 páginas en una computadora sin GPU tarda mucho. En Google Colab, con una GPU gratuita, es mucho más rápido.
@@ -329,6 +345,10 @@ La medición anterior a la última dio 13/17 en respuesta. El caso que se sumó 
 La corrida del 07/11/2026, ya en WSL, repitió 14/17 y 2/2. Con el cupo mínimo de 12 candidatos y la regla de dosis máxima, los 9 casos de dosis pasaron a 9/9 y el respaldo a 9/9. Con las continuaciones de página y la regla de puntaje máximo, la corrida oficial del 07/11/2026 pasó a 17/17: no queda ningún caso fallando.
 
 El detalle de cada caso y la evolución entre versiones están en la hoja de cálculo. Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas, anota el resultado en la hoja *Historial* y en el mensaje del commit.
+
+### Notas clínicas (SOAP)
+
+`test_soap.py` comprueba el parser y que el módulo rechace la nube sin permiso. `probar_soap.py` procesa las cinco notas ficticias con Ollama y mide cuatro cosas: que aparezcan las cinco secciones, que estén los datos clave de cada nota, que el Examen del Estado Mental tenga contenido y que el Análisis recoja el diagnóstico que la nota ya menciona.
 
 ### Banco de pruebas
 

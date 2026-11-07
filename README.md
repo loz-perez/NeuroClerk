@@ -69,6 +69,7 @@ NeuroClerk/
 ├── HOJA_DE_RUTA.md
 ├── README.md
 ├── AGENTS.md              # guía para DeepSeek Harness (DSH)
+├── TODO.md                # registro de tareas pendientes
 └── CLAUDE.md              # guía para Claude Code
 ```
 

@@ -41,6 +41,7 @@ cd ~/neuroclerk
 - SOAP: 5/5 notas con secciones, datos, examen mental y análisis.
 - Fases: 1 ✅, 2 🔵 casi completa por el caso 13, 3 ✅, 4 ⚪ pendiente.
 - Ragas: pendiente de recalcular con las respuestas nuevas.
+- El registro corto de pendientes está en `TODO.md`.
 
 ## Arquitectura
 

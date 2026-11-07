@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 NeuroClerk es un asistente de psiquiatría con RAG: responde solo con documentos de referencia (`datos/`) y cita archivo y página de cada dato. El RAG está escrito a mano y sin framework a propósito, para entender cada pieza: no introducir LangChain ni LlamaIndex sin que se pida. El código, los comentarios, la documentación y los mensajes de commit están en español.
 
-El estado de cada fase y los próximos pasos están en `HOJA_DE_RUTA.md`; qué documentos usar, en `DATOS.md`.
+El estado de cada fase y los próximos pasos están en `HOJA_DE_RUTA.md`; el registro corto de pendientes, en `TODO.md`; qué documentos usar, en `DATOS.md`.
 
 ## Comandos
 

@@ -42,7 +42,7 @@ MAX_TOKENS_RESPUESTA = 700 if PROVEEDOR == "ollama" else 2000   # los de la nube
 MODELO_EMBEDDINGS = "intfloat/multilingual-e5-base"   # lee hasta ~300 palabras
 TAM_CHUNK = 200                # palabras por fragmento
 SOLAPE = 40                    # palabras repetidas entre fragmentos
-K_MIN, K_MAX = 3, 15           # candidatos por PDF: 3 en una ficha corta, hasta 15 en un libro
+K_MIN, K_MAX = 12, 15          # candidatos por PDF: 12 en una ficha corta, hasta 15 en un libro
 FRAGMENTOS_POR_CANDIDATO = 100 # un candidato más por cada 100 fragmentos del documento
 MARGEN = 0.03                  # se descarta lo que esté a más de esto del mejor fragmento
 MAX_FRAGMENTOS = 12            # tope de fragmentos que llegan al modelo
@@ -445,8 +445,11 @@ def responder(pregunta):
         "- No inventes dosis: la dosis que des debe estar escrita textualmente en un fragmento que cites, con su unidad.\n"
         "- Una dosis solo vale para el fármaco, la indicación, la edad y la vía que indica el fragmento; no la traslades a otro uso.\n"
         "- Si el contexto no trae la dosis para ese fármaco, esa edad o ese uso, dilo; no la aproximes ni la calcules.\n"
+        "- Si la pregunta pide un máximo y el fragmento dice que la dosis puede aumentarse hasta un valor (por ejemplo, 'la dosis inicial es 5 mg y puede aumentarse hasta 10 mg'), ese valor es la dosis máxima: respóndelo con la cita. No respondas que falta la dosis máxima si el fragmento indica ese límite.\n"
         "- Si el contexto no alcanza para responder, dilo.\n\n"
-        f"Contexto:\n{contexto}\n\nPregunta: {pregunta}\n\nRespuesta en español:"
+        f"Contexto:\n{contexto}\n\nPregunta: {pregunta}\n\n"
+        "Recuerda: si un fragmento dice que la dosis puede aumentarse hasta un valor, ese valor es la dosis máxima y debes responderlo con la cita.\n\n"
+        "Respuesta en español:"
     )
 
     print("\nGenerando respuesta...", flush=True)

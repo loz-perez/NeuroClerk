@@ -30,7 +30,7 @@ flowchart LR
 2. **Tablas:** `pdfplumber` detecta las tablas y las guarda con su título delante: un fragmento por fila en las tablas con columnas, y uno por categoría (por ejemplo *Sustratos* e *Inhibidores*) en las listas agrupadas. Las tablas que siguen en otra columna de la página heredan el título.
 3. **Dividir:** parte el texto en fragmentos de 200 palabras que se solapan 40, para no cortar una idea a la mitad.
 4. **Indexar:** convierte cada fragmento en un vector y lo guarda en ChromaDB. Solo se hace la primera vez, o cuando un PDF es nuevo o cambió. Cada PDF se reconoce por una huella de su contenido, así que la base se puede indexar en otra computadora (por ejemplo, en Colab).
-5. **Recuperar:** busca los fragmentos más parecidos de **cada** archivo (3 en una ficha corta, hasta 15 en un libro) y descarta los que quedan muy por debajo del mejor.
+5. **Recuperar:** busca los fragmentos más parecidos de **cada** archivo (12 en una ficha corta, hasta 15 en un libro) y descarta los que quedan muy por debajo del mejor.
 6. **Generar:** le pasa esos fragmentos al modelo con instrucciones de responder solo con el contexto y citar cada afirmación. La respuesta se muestra solo si el modelo confirma que terminó, y los errores pasajeros del proveedor se reintentan solos. No da ninguna dosis que no esté escrita textualmente en un fragmento que cite.
 
 ## Estructura del proyecto
@@ -244,13 +244,13 @@ Todo se ajusta en el bloque 0 de `rag.py`:
 | `MODELO_EMBEDDINGS` | `intfloat/multilingual-e5-base` | Modelo que convierte texto en vectores |
 | `TAM_CHUNK` | `200` | Palabras por fragmento |
 | `SOLAPE` | `40` | Palabras repetidas entre fragmentos seguidos |
-| `K_MIN`, `K_MAX` | `3`, `15` | Candidatos que se buscan en cada PDF: 3 en una ficha corta, hasta 15 en un libro |
+| `K_MIN`, `K_MAX` | `12`, `15` | Candidatos que se buscan en cada PDF: 12 en una ficha corta, hasta 15 en un libro |
 | `FRAGMENTOS_POR_CANDIDATO` | `100` | Un candidato más por cada 100 fragmentos del documento |
 | `MARGEN` | `0.03` | Se descartan los fragmentos que quedan más de esto por debajo del mejor |
 | `MAX_FRAGMENTOS` | `12` | Tope de fragmentos que llegan al modelo |
 | `MAX_POR_PAGINA` | `2` | Tope de fragmentos de una misma página, para que una tabla con muchas filas no ocupe todo el contexto |
 | `SIMILITUD_DUPLICADO` | `0.5` | Dos fragmentos de una misma página que comparten más de esta proporción de palabras se consideran el mismo texto, y se usa solo uno (pasa cuando un cuadro se lee como texto y también como tabla) |
-| `VERSION_TEXTO` | `3` | Súbela cada vez que cambies cómo se extrae o se divide el texto |
+| `VERSION_TEXTO` | `4` | Súbela cada vez que cambies cómo se extrae o se divide el texto |
 
 El modelo trabaja con `temperature` 0.1, para que se apegue al texto. El tope de la respuesta es de 700 tokens con Ollama y de 2.000 con los proveedores en la nube, que cuentan su razonamiento dentro de ese tope.
 
@@ -304,12 +304,12 @@ Resultados:
 | Fuente | 16/17 | 17/17 | 17/17 |
 | Respuesta | 12/17 | 14/17 | 14/17 |
 | Abstención | 2/2 | 2/2 | 2/2 |
-| Dosis | — | 7/9 | 7/9 |
-| Respaldo de dosis | — | 7/7 | 7/7 |
+| Dosis | — | 7/9 | 9/9 |
+| Respaldo de dosis | — | 7/7 | 9/9 |
 
 La medición anterior a la última dio 13/17 en respuesta. El caso que se sumó es el 17, porque se agregaron palabras clave a la prueba, no porque mejorara el sistema. Siguen fallando los casos 12 (CIE-11), 13 (mhGAP) y 16 (PHQ-9).
 
-La corrida del 07/11/2026, ya en WSL, repitió los mismos totales. Los casos que fallan siguen siendo el 12 (CIE-11), el 13 (mhGAP), el 16 (PHQ-9) y los de dosis 22 (escitalopram en mayores de 65) y 24 (lamotrigina con valproato).
+La corrida del 07/11/2026, ya en WSL, repitió 14/17 y 2/2. Con el cupo mínimo de 12 candidatos y la regla de dosis máxima, los 9 casos de dosis pasaron a 9/9 y el respaldo a 9/9. Siguen fallando el 12 (CIE-11), el 13 (mhGAP) y el 16 (PHQ-9).
 
 El detalle de cada caso y la evolución entre versiones están en la hoja de cálculo. Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas, anota el resultado en la hoja *Historial* y en el mensaje del commit.
 

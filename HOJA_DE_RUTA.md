@@ -2,14 +2,14 @@
 
 *Actualizada el 7 de noviembre de 2026.*
 
-NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 14 de 17, más 2 de 2 abstenciones y 7 de 9 casos de dosis. Para cerrar la fase 2 faltan los tres casos que fallan (dos de búsqueda y uno del modelo), dos casos de dosis y el flujo de advertencias; la regla de dosis ya está en el prompt; después vienen el módulo de notas clínicas y la interfaz web.
+NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 14 de 17, más 2 de 2 abstenciones y 9 de 9 casos de dosis. Para cerrar la fase 2 faltan los tres casos que fallan (dos de búsqueda y uno del modelo) y el flujo de advertencias; después vienen el módulo de notas clínicas y la interfaz web.
 
 ## De un vistazo
 
 | Fase | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Entorno y fundamentos de RAG | ✅ Completada |
-| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: respuestas 14/17, faltan dos casos de dosis y las advertencias |
+| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: respuestas 14/17, faltan los tres casos de búsqueda/modelo y las advertencias |
 | 3 | Módulo de documentación clínica (notas SOAP) | ⚪ Pendiente |
 | 4 | Interfaz y pruebas con usuarios | ⚪ Pendiente |
 
@@ -51,7 +51,7 @@ Es la base del resto del proyecto. Responde preguntas cruzando varias fuentes y 
 
 Hecho:
 
-- Búsqueda por archivo, con un cupo de candidatos proporcional al tamaño de cada documento (de 3 a 15).
+- Búsqueda por archivo, con un cupo de candidatos proporcional al tamaño de cada documento (de 12 a 15).
 - Filtros sobre los candidatos:
   - Descarta los fragmentos que quedan a más de 0.03 del mejor.
   - Hasta 2 fragmentos por página, para que una sola tabla no desplace a las otras fuentes.
@@ -76,8 +76,9 @@ Evolución de las pruebas:
 | Tope de 12 fragmentos, caso de la CIE-11 reformulado, claves ampliadas en el caso clínico y 2 fichas más | 7/7 | 17/17 | 14/17 | 2/2 |
 | Migración a WSL; tablas partidas y banco de pruebas | 7/7 | 17/17 | 14/17 | 2/2 |
 | Regla de dosis en el prompt | 7/7 | 17/17 | 14/17 | 2/2 |
+| Cupo mínimo 12 y regla de dosis máxima en el prompt | 7/7 | 17/17 | 14/17 | 2/2 |
 
-El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales.
+El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales; el cupo 12 y la regla de máximo llevaron las dosis a 9/9 y el respaldo a 9/9.
 
 Falta:
 
@@ -85,9 +86,6 @@ Falta:
   - **CIE-11 (búsqueda):** la página 504, con la equivalencia de la esquizofrenia, no llega al contexto, ni siquiera con la pregunta reformulada.
   - **PHQ-9 (búsqueda):** llega solo la página 1 del cuestionario; el 27 aparece únicamente en la página 2 ("20-27 Severe").
   - **mhGAP (modelo):** con el tope de 12 ya llega el Cuadro 1 de antidepresivos (página 37, puesto 5), pero el modelo responde que el contexto no alcanza.
-- Resolver los casos de dosis que fallan (7/9 y respaldo 7/7, ya con la regla de dosis en el prompt desde el 07/11/2026):
-  - **Escitalopram en mayores de 65 (modelo):** la dosis llega al contexto, pero responde que no está.
-  - **Lamotrigina con valproato (búsqueda):** la pauta de 12,5 mg/día no llega al contexto. El modelo se abstiene y no da la dosis equivocada.
 - Documentos en inglés: con preguntas en español casi no llegan al contexto. Dos documentos sobre zolpidem que se probaron y se quitaron no aparecieron en ninguno de los 28 casos, y es posible que a la tabla de Flockhart le pase lo mismo.
 - Revisar si el límite por página corta listas largas: en la tabla de inhibidores del CYP2D6, la continuación queda afuera.
 - Un flujo de consulta tipo *"Paciente toma fluoxetina, ¿puedo añadir tramadol?"* con una advertencia destacada. Hoy responde en texto libre.
@@ -115,7 +113,7 @@ Las citas por afirmación y las pruebas automáticas cubren buena parte de la re
 
 | Regla | Estado | Qué hay hoy | Qué falta |
 | --- | --- | --- | --- |
-| Cero alucinaciones en dosis | Parcial | Responde solo con el contexto, cita cada afirmación, temperatura 0.1; una prueba comprueba que no invente la dosis de un fármaco que no está en los documentos; 9 casos de dosis y un chequeo de que cada dosis de la respuesta esté en los fragmentos. Desde el 07/11/2026 el prompt exige que la dosis esté textual y para ese uso | Resolver los casos 22 (escitalopram) y 24 (lamotrigina), que siguen fallando |
+| Cero alucinaciones en dosis | Parcial | Responde solo con el contexto, cita cada afirmación, temperatura 0.1; una prueba comprueba que no invente la dosis de un fármaco que no está en los documentos; 9 casos de dosis y un chequeo de que cada dosis de la respuesta esté en los fragmentos. Desde el 07/11/2026 el prompt exige que la dosis esté textual y para ese uso | Sin pendientes: 9/9 en dosis y 9/9 de respaldo (07/11/2026) |
 | Humano en el bucle | Parcial | Muestra los fragmentos usados para verificar cada dato | La revisión y firma de notas llega con la fase 3 |
 | Datos sintéticos | Pendiente | Todavía no se usan datos de pacientes | Escribir los casos ficticios para las fases 2 y 3 |
 | Privacidad | Parcial | La búsqueda es local; los PDFs, la base vectorial y las claves no se suben a Git, lo que importa porque el repositorio es público; Ollama permite trabajar sin enviar nada fuera | Con Gemini o Groq, la pregunta y los fragmentos salen a la nube: datos de pacientes, solo con Ollama |

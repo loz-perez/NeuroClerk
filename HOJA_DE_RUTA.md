@@ -9,7 +9,7 @@ NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 docum
 | Fase | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Entorno y fundamentos de RAG | ✅ Completada |
-| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: 16/17, 2/2 y 9/9; el caso 13 es inestable |
+| 2 | Consulta farmacológica con RAG | 🔵 Abierta: mejor 16/17, 2/2 y 9/9; objetivo 17/17; el caso 13 no se acepta como limitación |
 | 3 | Módulo de documentación clínica (notas SOAP) | ✅ Completada: 5/5 notas |
 | 4 | Interfaz y pruebas con usuarios | ⚪ Pendiente |
 

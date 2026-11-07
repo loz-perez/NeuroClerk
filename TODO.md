@@ -6,7 +6,7 @@ Registro corto de tareas pendientes. El contexto de cada fase está en `HOJA_DE_
 
 ## Prioridad alta
 
-- [ ] **Estabilizar el caso 13 (mhGAP).** La tabla de antidepresivos de la pág. 37 está en el contexto, pero `gemini-3.5-flash-lite` a veces responde que no hay fármacos. Criterio: 17/17 en dos corridas seguidas.
+- [ ] **Estabilizar el caso 13 (mhGAP) sin aceptar 16/17.** La tabla de antidepresivos de la pág. 37 está en el contexto, pero `gemini-3.5-flash-lite` a veces responde que no hay fármacos. Criterio: **17/17 en tres corridas consecutivas**, 2/2 abstenciones y 9/9 dosis. Cualquier regresión es un fallo abierto, no una limitación aceptada.
 - [ ] **Recalcular Ragas.** Exportar respuestas nuevas con `probar_rag.py --llm --exportar` y correr `.venv-ragas/bin/python evaluar_ragas.py`. Criterio: `ragas.json` actualizado y resumen anotado.
 - [ ] **Fase 4: interfaz Streamlit.** Dos pestañas (nota SOAP y consulta farmacológica), fragmentos visibles, selector de proveedor y aviso de uso obligatorio. Criterio: flujo completo con Ollama y con Gemini.
 
@@ -39,7 +39,7 @@ Registro corto de tareas pendientes. El contexto de cada fase está en `HOJA_DE_
 
 - 134 tests pasan, 0 xfail.
 - Búsqueda: 7/7 tablas, 17/17 fuentes, 9/9 fuentes de dosis.
-- Respuestas: 16/17; el único fallo es el caso 13.
+- Respuestas: 16/17 en la mejor corrida y 15/17 en la última; objetivo 17/17. 16/17 no se acepta como terminado.
 - Dosis: 9/9; respaldo 9/9.
 - SOAP: 5/5.
 - Base: 13.864 fragmentos de 61 PDFs; reindexación GPU en ~11,4 min.

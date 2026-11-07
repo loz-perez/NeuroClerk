@@ -81,6 +81,7 @@ Las reglas de capas, dependencias y código limpio están en `docs/ARQUITECTURA.
 - **Respuestas:** el modelo responde solo con el contexto y cita cada afirmación, con temperatura 0.1. Lo más delicado son las dosis, que no deben inventarse nunca: desde el 07/11/2026 el prompt exige que estén textuales en un fragmento citado, para ese fármaco y ese uso. Si la pregunta menciona dos fármacos del corpus, `responder()` muestra una advertencia de combinación y el prompt pide no afirmar que es segura sin cita. Los casos de abstención de las pruebas cubren parte de esto.
 - **Datos de pacientes:** nunca por Gemini ni Groq, solo con `PROVEEDOR = "ollama"`.
 - **Modelo fijo de pruebas:** `gemini-3.5-flash-lite`; no mezclar modelos dentro de una misma tanda. Si se agota el cupo, esperar el reinicio o correr la tanda completa con Gemini 3.1, nunca caso por caso.
+- **Sin regresiones:** 16/17 no se acepta. Cada cambio debe mantener o mejorar la última corrida; una corrida favorable aislada no cierra un caso. El objetivo es 17/17 estable y reproducible.
 - **`evaluaciones/`:** contiene texto de los PDFs, así que no se sube a Git.
 - **`datos/`:** es la fuente de verdad y todo lo que contiene puede citarse como bibliografía. Las notas y los casos ficticios van en `pruebas/`. No subir los PDFs a Git, por derechos de autor.
 - **Nombres de PDF:** claros y sin tildes ni eñes (`FT_Litio.pdf`), porque el modelo los cita y las tildes se desconfiguran entre Windows y Colab. Cada documento nuevo se registra en `fuentes.csv`.

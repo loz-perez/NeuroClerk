@@ -37,7 +37,7 @@ uvx ruff check .                       # estilo, imports y bugs simples
 - Base: 13.864 fragmentos de 61 PDFs; reindexación completa en GPU en ~11,4 min.
 - `pytest`: 134 pasan, 0 xfail.
 - Búsqueda: 7/7 tablas, 17/17 fuentes, 9/9 fuentes de dosis.
-- Respuestas: 16/17 en la corrida de referencia; la última dio 15/17 porque el caso 12 se abstuvo una vez (pasó 5/5 al repetirlo). El caso 13 (mhGAP) sigue inestable con `gemini-3.5-flash-lite`.
+- Respuestas: 16/17 en la mejor corrida y 15/17 en la última; el objetivo es 17/17. 16/17 no se acepta como terminado. El caso 12 se abstuvo una vez (5/5 al repetirlo); el caso 13 (mhGAP) sigue fallando con `gemini-3.5-flash-lite`.
 - Dosis: 9/9; respaldo 9/9.
 - SOAP: 5/5 notas con secciones, datos, examen mental y análisis.
 - Fases: 1 ✅, 2 🔵 casi completa por el caso 13, 3 ✅, 4 ⚪ pendiente.
@@ -63,6 +63,7 @@ uvx ruff check .                       # estilo, imports y bugs simples
 6. Mantener los commits en español y con el resultado de las pruebas.
 7. Antes de borrar algo del proyecto, comprobar que no lo usan los tests, la documentación ni las tareas de VS Code.
 8. **Modelo fijo de pruebas:** usar siempre `gemini-3.5-flash-lite` (`MODELO_PRUEBAS`). No mezclar modelos en una misma tanda. Si se agota el cupo, esperar el reinicio; si se evalúa Gemini 3.1, correr la tanda completa con ese modelo y dejarlo anotado.
+9. **Sin regresiones:** 16/17 no se acepta. Cada cambio debe mantener o mejorar la última corrida; una corrida favorable aislada no cierra un caso. El objetivo es 17/17 estable y reproducible.
 
 ## Herramientas de DSH
 

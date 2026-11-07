@@ -455,8 +455,11 @@ def _palabras(texto):
 def _parecido(texto_a, texto_b):
     """Proporción de palabras compartidas (índice de Jaccard): 0 = nada en común, 1 = iguales.
 
-    Antes se quita el comienzo que tienen en común: dos filas de una misma tabla repiten el
-    título, y sin esto parecerían duplicadas aunque hablen de fármacos distintos."""
+    Si los dos textos son exactamente iguales, devuelve 1.0. En los demás casos se quita el
+    comienzo que tienen en común: dos filas de una misma tabla repiten el título, y sin esto
+    parecerían duplicadas aunque hablen de fármacos distintos."""
+    if texto_a == texto_b:
+        return 1.0
     comun = len(os.path.commonprefix([texto_a, texto_b]))
     a, b = _palabras(texto_a[comun:]), _palabras(texto_b[comun:])
     return len(a & b) / len(a | b) if a and b else 0.0

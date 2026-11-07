@@ -35,9 +35,9 @@ uvx ruff check .                       # estilo, imports y bugs simples
 
 - Rama canónica: `feature/entorno-wsl`.
 - Base: 13.864 fragmentos de 61 PDFs; reindexación completa en GPU en ~11,4 min.
-- `pytest`: 133 pasan, 1 xfail (`_parecido` con textos idénticos).
+- `pytest`: 134 pasan, 0 xfail.
 - Búsqueda: 7/7 tablas, 17/17 fuentes, 9/9 fuentes de dosis.
-- Respuestas: 16/17; el caso 13 (mhGAP) es inestable con `gemini-3.5-flash-lite`.
+- Respuestas: 16/17 en la corrida de referencia; la última dio 15/17 porque el caso 12 se abstuvo una vez (pasó 5/5 al repetirlo). El caso 13 (mhGAP) sigue inestable con `gemini-3.5-flash-lite`.
 - Dosis: 9/9; respaldo 9/9.
 - SOAP: 5/5 notas con secciones, datos, examen mental y análisis.
 - Fases: 1 ✅, 2 🔵 casi completa por el caso 13, 3 ✅, 4 ⚪ pendiente.

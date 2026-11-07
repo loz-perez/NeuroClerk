@@ -111,7 +111,7 @@ cd ~/neuroclerk
 
 | Prueba | Resultado |
 | --- | --- |
-| `pytest` | 133 pasan, 1 xfail |
+| `pytest` | 134 pasan, 0 xfail |
 | `probar_rag.py` (búsqueda) | tabla 7/7, fuente 17/17, dosis 9/9 |
 | `probar_rag.py --llm` (28 casos) | 16/17 respuestas (caso 13 inestable), 2/2 abstenciones, 9/9 dosis, 9/9 respaldo |
 | Regla de dosis y cupo 12 | 9/9 dosis y 9/9 respaldo; 14/17 y 2/2 sin cambios |

@@ -82,7 +82,7 @@ Evolución de las pruebas:
 | Continuaciones de página y regla de puntaje máximo | 7/7 | 17/17 | 17/17 | 2/2 |
 | Reindexación GPU y reglas de combinación condicionales | 7/7 | 17/17 | 16/17 | 2/2 |
 
-El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales; el cupo 12 y la regla de máximo llevaron las dosis a 9/9 y el respaldo a 9/9. Las continuaciones de página y la regla de puntaje máximo cerraron 12 y 16; el 13 sigue inestable: 16/17 en la última corrida.
+El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales; el cupo 12 y la regla de máximo llevaron las dosis a 9/9 y el respaldo a 9/9. Las continuaciones de página y la regla de puntaje máximo cerraron 12 y 16; el 13 sigue inestable: 16/17 en la última corrida. Después del arreglo de `_parecido`, una corrida dio 15/17: el caso 12 se abstuvo una vez y el 13 falló; el 12 pasó 5/5 al repetirlo con el mismo contexto.
 
 Falta:
 
@@ -132,7 +132,7 @@ La fase 3 ya está hecha; queda estabilizar el caso 13 y construir la interfaz.
 - [x] Medir el tope de 12 fragmentos y la pregunta nueva de la CIE-11.
 - [x] Resolver los casos de la CIE-11 y el PHQ-9 (07/11/2026).
 - [ ] Estabilizar el caso 13 (mhGAP), que sigue inestable.
-- [ ] Corregir `_parecido`: devuelve 0.0 con dos textos idénticos, así que no los descarta como duplicados. Hay una prueba marcada como `xfail` en `test_rag.py`; al corregirlo, quitar la marca y volver a medir.
+- [x] Corregir `_parecido`: dos textos exactamente iguales ahora devuelven 1.0. Resuelto el 07/11/2026; 134 tests, 0 xfail.
 - [x] Casos de prueba de dosis y línea de base: 7/9, respaldo 7/7.
 - [x] Evaluación con Ragas (fidelidad y relevancia) en un entorno aparte.
 - [x] Agregar al prompt la regla de no dar dosis que no estén textuales en un fragmento citado, y medirla (07/11/2026: 7/9, respaldo 7/7).

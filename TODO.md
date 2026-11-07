@@ -13,8 +13,8 @@ Registro corto de tareas pendientes. El contexto de cada fase está en `HOJA_DE_
 ## Calidad y fase 2
 
 - [ ] **Revisar documentos en inglés.** Con preguntas en español casi no llegan al contexto; decidir si se traducen, se descartan o se indexan aparte.
+- [ ] **Vigilar la abstención ocasional del caso 12.** La pág. 504 está en el contexto y el caso pasó 5/5 al repetirlo; en una corrida el modelo dijo que no alcanzaba. No reproducido.
 - [ ] **Revisar el límite por página.** En la tabla de inhibidores del CYP2D6, la continuación queda afuera; evaluar si `MAX_POR_PAGINA=2` corta listas largas.
-- [ ] **Corregir `_parecido`.** Dos textos idénticos devuelven 0.0 en vez de 1.0; hay un `xfail` en `test_rag.py`. Al corregirlo, quitar la marca y volver a medir.
 - [ ] **Decidir qué hacer con `probar_tablas.py`.** Sus 7 casos ya están en `probar_rag.py`; si se elimina, actualizar README y CLAUDE.
 - [ ] **Mantener el Historial.** Cada corrida con `--llm` debe quedar en la hoja *Historial* y en el mensaje del commit.
 
@@ -37,7 +37,7 @@ Registro corto de tareas pendientes. El contexto de cada fase está en `HOJA_DE_
 
 ## Estado de partida
 
-- 133 tests pasan, 1 xfail.
+- 134 tests pasan, 0 xfail.
 - Búsqueda: 7/7 tablas, 17/17 fuentes, 9/9 fuentes de dosis.
 - Respuestas: 16/17; el único fallo es el caso 13.
 - Dosis: 9/9; respaldo 9/9.

@@ -260,8 +260,6 @@ def test_parecido_filas_de_una_tabla_no_cuentan_el_titulo_que_repiten():
     assert _parecido(titulo + "sertralina", titulo + "fluoxetina") == 0.0
 
 
-@pytest.mark.xfail(strict=True, reason="Error conocido: al quitar el comienzo común de dos textos "
-                                       "iguales no queda nada que comparar y devuelve 0.0, no 1.0.")
 def test_parecido_textos_identicos_es_uno():
     assert _parecido("alfa beta gamma", "alfa beta gamma") == 1.0
 

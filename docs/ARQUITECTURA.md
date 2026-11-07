@@ -65,7 +65,6 @@ Cualquier import nuevo entre módulos debe agregarse a esta tabla y a `test_arqu
 
 - `rag.py` usa estado global por diseño; hay que respetar el contrato de `preparar()`.
 - `responder()` y `generar()` son largas porque contienen el prompt y los reintentos; no crecer más.
-- `_parecido()` devuelve 0.0 con dos textos idénticos; hay un `xfail` que lo documenta.
 - `probar_rag.py` y `banco.py` comparten criterios de medición que hoy están duplicados.
 
 ## Cómo se verifica

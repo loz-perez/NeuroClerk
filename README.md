@@ -335,14 +335,14 @@ Resultados:
 | --- | --- | --- | --- |
 | Tabla | 7/7 | 7/7 | 7/7 |
 | Fuente | 16/17 | 17/17 | 17/17 |
-| Respuesta | 12/17 | 14/17 | 17/17 |
+| Respuesta | 12/17 | 14/17 | 16/17 |
 | Abstención | 2/2 | 2/2 | 2/2 |
 | Dosis | — | 7/9 | 9/9 |
 | Respaldo de dosis | — | 7/7 | 9/9 |
 
 La medición anterior a la última dio 13/17 en respuesta. El caso que se sumó es el 17, porque se agregaron palabras clave a la prueba, no porque mejorara el sistema. En esa medición fallaban los casos 12 (CIE-11), 13 (mhGAP) y 16 (PHQ-9).
 
-La corrida del 07/11/2026, ya en WSL, repitió 14/17 y 2/2. Con el cupo mínimo de 12 candidatos y la regla de dosis máxima, los 9 casos de dosis pasaron a 9/9 y el respaldo a 9/9. Con las continuaciones de página y la regla de puntaje máximo, la corrida oficial del 07/11/2026 pasó a 17/17: no queda ningún caso fallando.
+La corrida del 07/11/2026, ya en WSL, repitió 14/17 y 2/2. Con el cupo mínimo de 12 candidatos y la regla de dosis máxima, los 9 casos de dosis pasaron a 9/9 y el respaldo a 9/9. Con las continuaciones de página y la regla de puntaje máximo, la corrida del 07/11/2026 dio 17/17 una vez, pero al repetirla sobre la base reindexada en GPU dio 16/17: el caso 13 (mhGAP) es inestable. La tabla de la pág. 37 está en el contexto y la base CPU devuelve el mismo fragmento en el mismo puesto, así que el fallo es del modelo liviano, no del índice.
 
 El detalle de cada caso y la evolución entre versiones están en la hoja de cálculo. Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas, anota el resultado en la hoja *Historial* y en el mensaje del commit.
 

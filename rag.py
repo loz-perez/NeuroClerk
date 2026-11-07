@@ -506,6 +506,7 @@ def advertencia_de_combinacion(pregunta, archivos=None):
 def responder(pregunta):
     encontrados = recuperar(pregunta)
 
+    farmacos = farmacos_mencionados(pregunta)
     aviso = advertencia_de_combinacion(pregunta)
     if aviso:
         print("\n" + aviso)
@@ -517,6 +518,17 @@ def responder(pregunta):
     contexto = "\n\n".join(
         f"[{c['archivo']}, página {c['pagina']}] {c['texto']}" for c in encontrados
     )
+    reglas_combinacion = ""
+    recordatorio_combinacion = ""
+    if len(farmacos) >= 2:
+        reglas_combinacion = (
+            "- Si la pregunta combina dos o más fármacos, trátala como consulta de interacción: "
+            "describe el riesgo, el mecanismo si está en el contexto y qué hacer.\n"
+            "- Si el contexto no menciona la interacción entre esos fármacos, dilo expresamente; "
+            "no afirmes que la combinación es segura.\n"
+        )
+        recordatorio_combinacion = " Si la pregunta combina fármacos, no afirmes que la combinación es segura sin una cita."
+
     prompt = (
         "Eres un asistente que responde SOLO con la información del contexto.\n"
         "Reglas:\n"
@@ -529,12 +541,12 @@ def responder(pregunta):
         "- Si el contexto no trae la dosis para ese fármaco, esa edad o ese uso, dilo; no la aproximes ni la calcules.\n"
         "- Si la pregunta pide un máximo y el fragmento dice que la dosis puede aumentarse hasta un valor (por ejemplo, 'la dosis inicial es 5 mg y puede aumentarse hasta 10 mg'), ese valor es la dosis máxima: respóndelo con la cita. No respondas que falta la dosis máxima si el fragmento indica ese límite.\n"
         "- Si la pregunta pide el puntaje máximo de una escala y el fragmento muestra rangos (por ejemplo, '20-27 Severe'), el extremo superior del último rango es el máximo; dilo con la cita.\n"
-        "- Si la pregunta combina dos o más fármacos, trátala como consulta de interacción: describe el riesgo, el mecanismo si está en el contexto y qué hacer.\n"
-        "- Si el contexto no menciona la interacción entre esos fármacos, dilo expresamente; no afirmes que la combinación es segura.\n"
-        "- Si el contexto no alcanza para responder, dilo.\n\n"
-        f"Contexto:\n{contexto}\n\nPregunta: {pregunta}\n\n"
-        "Recuerda: si un fragmento dice que la dosis puede aumentarse hasta un valor, ese valor es la dosis máxima y debes responderlo con la cita. Si la pregunta combina fármacos, no afirmes que la combinación es segura sin una cita.\n\n"
-        "Respuesta en español:"
+        + reglas_combinacion
+        + "- Si el contexto no alcanza para responder, dilo.\n\n"
+        + f"Contexto:\n{contexto}\n\nPregunta: {pregunta}\n\n"
+        + "Recuerda: si un fragmento dice que la dosis puede aumentarse hasta un valor, ese valor es la dosis máxima y debes responderlo con la cita."
+        + recordatorio_combinacion + "\n\n"
+        + "Respuesta en español:"
     )
 
     print("\nGenerando respuesta...", flush=True)

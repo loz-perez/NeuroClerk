@@ -2,14 +2,14 @@
 
 *Actualizada el 7 de noviembre de 2026.*
 
-NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 17 de 17, más 2 de 2 abstenciones y 9 de 9 casos de dosis. La fase 2 queda cerrada y el módulo de notas clínicas también; sigue la interfaz web.
+NeuroClerk responde consultas farmacológicas y clínicas con RAG sobre 61 documentos de referencia, y cita el archivo y la página de cada dato. Un conjunto de 28 pruebas mide la búsqueda y las respuestas sobre todos los tipos de documento: hoy encuentra la tabla correcta en 7 de 7 casos, una fuente válida en 17 de 17, y responde bien en 16 de 17 en la última corrida, más 2 de 2 abstenciones y 9 de 9 casos de dosis. La fase 2 queda casi cerrada: el caso 13 (mhGAP) es inestable; el módulo de notas clínicas ya está y sigue la interfaz web.
 
 ## De un vistazo
 
 | Fase | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Entorno y fundamentos de RAG | ✅ Completada |
-| 2 | Consulta farmacológica con RAG | ✅ Completada: 17/17, 2/2 y 9/9 |
+| 2 | Consulta farmacológica con RAG | 🔵 Casi completa: 16/17, 2/2 y 9/9; el caso 13 es inestable |
 | 3 | Módulo de documentación clínica (notas SOAP) | ✅ Completada: 5/5 notas |
 | 4 | Interfaz y pruebas con usuarios | ⚪ Pendiente |
 
@@ -80,11 +80,13 @@ Evolución de las pruebas:
 | Regla de dosis en el prompt | 7/7 | 17/17 | 14/17 | 2/2 |
 | Cupo mínimo 12 y regla de dosis máxima en el prompt | 7/7 | 17/17 | 14/17 | 2/2 |
 | Continuaciones de página y regla de puntaje máximo | 7/7 | 17/17 | 17/17 | 2/2 |
+| Reindexación GPU y reglas de combinación condicionales | 7/7 | 17/17 | 16/17 | 2/2 |
 
-El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales; el cupo 12 y la regla de máximo llevaron las dosis a 9/9 y el respaldo a 9/9. Las continuaciones de página y la regla de puntaje máximo cerraron los tres casos que fallaban: 17/17.
+El caso que se sumó en la fila del tope de 12 fragmentos es el clínico, por las claves ampliadas de la prueba; los otros cambios no resolvieron ningún caso que fallaba. La migración a WSL no cambió los totales; el cupo 12 y la regla de máximo llevaron las dosis a 9/9 y el respaldo a 9/9. Las continuaciones de página y la regla de puntaje máximo cerraron 12 y 16; el 13 sigue inestable: 16/17 en la última corrida.
 
 Falta:
 
+- Estabilizar el caso 13 (mhGAP): la tabla de antidepresivos de la pág. 37 está en el contexto, pero el modelo a veces responde que no hay fármacos. La base CPU y la GPU devuelven el mismo fragmento en el mismo puesto.
 - Documentos en inglés: con preguntas en español casi no llegan al contexto. Dos documentos sobre zolpidem que se probaron y se quitaron no aparecieron en ninguno de los 28 casos, y es posible que a la tabla de Flockhart le pase lo mismo.
 - Revisar si el límite por página corta listas largas: en la tabla de inhibidores del CYP2D6, la continuación queda afuera.
 

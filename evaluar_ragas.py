@@ -8,14 +8,17 @@
 #   .venv-ragas\Scripts\python.exe evaluar_ragas.py              -> las evalúa
 #   .venv-ragas\Scripts\python.exe evaluar_ragas.py --limite 5   -> solo 5 evaluaciones nuevas
 #   .venv-ragas\Scripts\python.exe evaluar_ragas.py --modelo gemini-3.1-flash-lite
-#                                                                -> otro evaluador: cada modelo tiene su cupo
+#                                                                -> otro evaluador: con su cupo y su archivo
 #   .venv-ragas\Scripts\python.exe evaluar_ragas.py --resumen    -> muestra lo ya evaluado
+#                                                                   (con --modelo, lo de ese evaluador)
 #
 # Cada resultado se guarda al obtenerlo: si se agota el cupo, volver a correrlo sigue donde quedó.
+# Cada evaluador tiene su archivo de resultados, para que sus puntajes no se mezclen.
 #
 # Mide dos cosas, ninguna necesita una respuesta de referencia:
 #   fidelidad    ¿lo que afirma la respuesta está respaldado por los fragmentos? (2 peticiones)
-#   relevancia   ¿la respuesta contesta lo que se preguntó? (1 petición y embeddings)
+#                No se mide si la respuesta solo se abstiene: no afirma nada.
+#   relevancia   ¿la respuesta contesta lo que se preguntó? (3 peticiones y embeddings)
 # No reemplaza el chequeo de dosis de probar_rag.py, que es exacto y no depende de un modelo.
 #
 # Envía preguntas, fragmentos y respuestas a Gemini: nunca usarlo con datos de pacientes.
@@ -34,8 +37,9 @@ ARCHIVO_RESULTADOS = Path("evaluaciones/ragas.json")
 URL_GEMINI = "https://generativelanguage.googleapis.com/v1beta/openai/"
 MODELO_EVALUADOR = "gemini-3.5-flash-lite"
 MODELO_EMBEDDINGS = "gemini-embedding-001"
-MAX_TOKENS_EVALUADOR = 4000   # la lista de afirmaciones de una respuesta larga no debe cortarse
-PREGUNTAS_RELEVANCIA = 1      # Ragas usa 3 por defecto: con 1 se gasta menos cupo, pero varía más
+MAX_TOKENS_EVALUADOR = 8000   # la lista de afirmaciones de una respuesta larga no debe cortarse (con 4000 pasó)
+PREGUNTAS_RELEVANCIA = 3      # el valor por defecto de Ragas: con 1 gasta menos cupo, pero varía más
+                              # al cambiarlo hay que volver a evaluar la relevancia
 PETICIONES_POR_MINUTO = 12    # el plan gratuito permite 15: se deja margen
 INTENTOS = 3                  # por evaluación, ante límites por minuto y servidor saturado
 ESPERA_SERVIDOR = 30          # segundos, cuando el servidor está saturado (503)
@@ -43,12 +47,24 @@ ESPERA_SERVIDOR = 30          # segundos, cuando el servidor está saturado (503
 # En estos casos lo correcto es no responder, y la relevancia castiga justamente eso
 TIPOS_SIN_RELEVANCIA = ("abstencion", "dosis_ausente")
 
+# Una abstención no afirma nada, y el puntaje de fidelidad depende de cómo la interprete cada evaluador
+FRASES_DE_ABSTENCION = ("no alcanza para responder", "no contiene información")
+
+
+def solo_se_abstiene(respuesta):
+    """Si la respuesta dice que no puede responder y no cita nada: no hay afirmaciones que verificar."""
+    texto = respuesta.lower()
+    return ".pdf" not in texto and any(frase in texto for frase in FRASES_DE_ABSTENCION)
+
 
 def metricas_de(caso):
-    """Las métricas que tienen sentido para un tipo de caso."""
-    if caso["tipo"] in TIPOS_SIN_RELEVANCIA:
-        return ["fidelidad"]
-    return ["fidelidad", "relevancia"]
+    """Las métricas que tienen sentido para un caso, según su tipo y su respuesta."""
+    metricas = []
+    if not solo_se_abstiene(caso["respuesta"]):
+        metricas.append("fidelidad")
+    if caso["tipo"] not in TIPOS_SIN_RELEVANCIA:
+        metricas.append("relevancia")
+    return metricas
 
 
 def contextos_de(caso):
@@ -75,7 +91,8 @@ def resumir(casos, resultados):
         if previo.get("respuesta") != caso["respuesta"]:
             continue
         for metrica, valor in previo["metricas"].items():
-            grupos.setdefault((caso["tipo"], metrica), []).append(valor)
+            if metrica in metricas_de(caso):   # un puntaje guardado de una métrica que ya no aplica no cuenta
+                grupos.setdefault((caso["tipo"], metrica), []).append(valor)
     resumen = {}
     for clave, valores in grupos.items():
         validos = [v for v in valores if v is not None]
@@ -84,11 +101,18 @@ def resumir(casos, resultados):
     return resumen
 
 
-def guardar(resultados):
-    ARCHIVO_RESULTADOS.parent.mkdir(exist_ok=True)
-    temporal = ARCHIVO_RESULTADOS.with_suffix(".tmp")
+def archivo_resultados(modelo):
+    """Dónde se guardan los puntajes de un evaluador: el de por defecto conserva ragas.json."""
+    if modelo == MODELO_EVALUADOR:
+        return ARCHIVO_RESULTADOS
+    return ARCHIVO_RESULTADOS.with_name(f"ragas_{modelo}.json")
+
+
+def guardar(resultados, archivo):
+    archivo.parent.mkdir(exist_ok=True)
+    temporal = archivo.with_suffix(".tmp")
     temporal.write_text(json.dumps(resultados, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporal.replace(ARCHIVO_RESULTADOS)   # si algo se corta al escribir, el archivo anterior sigue entero
+    temporal.replace(archivo)   # si algo se corta al escribir, el archivo anterior sigue entero
 
 
 class Ritmo:
@@ -130,7 +154,7 @@ def mostrar_resumen(casos, resultados):
     valores = []
     for caso in casos:
         previo = resultados.get(caso["pregunta"], {})
-        if previo.get("respuesta") == caso["respuesta"]:
+        if previo.get("respuesta") == caso["respuesta"] and "fidelidad" in metricas_de(caso):
             valor = previo["metricas"].get("fidelidad")
             if valor is not None:
                 valores.append((valor, caso["pregunta"]))
@@ -206,7 +230,7 @@ async def evaluar(casos, resultados, limite, modelo):
             previo = {"respuesta": caso["respuesta"], "metricas": {}}
         previo["metricas"][metrica] = valor
         resultados[caso["pregunta"]] = previo
-        guardar(resultados)
+        guardar(resultados, archivo_resultados(modelo))
 
 
 def main():
@@ -214,14 +238,16 @@ def main():
         raise SystemExit(f"No existe {ARCHIVO_RESPUESTAS}: primero corre "
                          r"'.venv\Scripts\python.exe probar_rag.py --llm --exportar'.")
     casos = json.loads(ARCHIVO_RESPUESTAS.read_text(encoding="utf-8"))
+    modelo = sys.argv[sys.argv.index("--modelo") + 1] if "--modelo" in sys.argv else MODELO_EVALUADOR
+    archivo = archivo_resultados(modelo)
     resultados = {}
-    if ARCHIVO_RESULTADOS.exists():
-        resultados = json.loads(ARCHIVO_RESULTADOS.read_text(encoding="utf-8"))
+    if archivo.exists():
+        resultados = json.loads(archivo.read_text(encoding="utf-8"))
 
     if "--resumen" not in sys.argv:
         limite = int(sys.argv[sys.argv.index("--limite") + 1]) if "--limite" in sys.argv else None
-        modelo = sys.argv[sys.argv.index("--modelo") + 1] if "--modelo" in sys.argv else MODELO_EVALUADOR
         asyncio.run(evaluar(casos, resultados, limite, modelo))
+    print(f"\nEvaluador: {modelo} ({archivo})")
     mostrar_resumen(casos, resultados)
 
 

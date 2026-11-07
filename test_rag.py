@@ -6,6 +6,7 @@
 # menos de un segundo. La calidad de la búsqueda y de las respuestas se mide con probar_rag.py.
 
 import asyncio
+import json
 import sys
 import time
 from types import SimpleNamespace
@@ -13,9 +14,10 @@ from types import SimpleNamespace
 import pytest
 
 import rag
-from evaluar_ragas import Ritmo, contextos_de, espera_por_limite, metricas_de, pendientes, resumir
+from evaluar_ragas import (MODELO_EVALUADOR, Ritmo, archivo_resultados, contextos_de, espera_por_limite,
+                           guardar, metricas_de, pendientes, resumir)
 from probar_rag import dosis_sin_respaldo, extraer_dosis, respuesta_ok
-from rag import _parecido, dividir_en_chunks, tabla_a_unidades
+from rag import _parecido, dividir_en_chunks, tabla_a_unidades, unir_tablas_partidas
 
 
 def pagina(texto, numero=1):
@@ -113,6 +115,100 @@ def test_tabla_vacia_no_da_unidades(filas):
 
 def test_tabla_con_solo_titulo_no_da_unidades():
     assert tabla_a_unidades([["Tabla 1. Riesgos", None]]) == ("Tabla 1. Riesgos", None, [])
+
+
+def test_tabla_fila_de_seccion_acompana_a_las_filas_siguientes():
+    filas = [["Pauta", "Semanas 1 + 2"],
+             ["CON valproato", ""],
+             ["Con otros fármacos", "12,5 mg/día"],
+             ["Sin otros fármacos", "12,5 mg/día"],
+             ["SIN valproato", ""],
+             ["Con inductores", "50 mg/día"]]
+    _, _, unidades = tabla_a_unidades(filas)
+    assert unidades == [("CON valproato", "Pauta: Con otros fármacos; Semanas 1 + 2: 12,5 mg/día"),
+                        ("CON valproato", "Pauta: Sin otros fármacos; Semanas 1 + 2: 12,5 mg/día"),
+                        ("SIN valproato", "Pauta: Con inductores; Semanas 1 + 2: 50 mg/día")]
+
+
+def test_tabla_nota_final_no_hereda_la_seccion():
+    filas = [["Pauta", "Dosis"], ["CON valproato", ""], ["Adultos", "25 mg"], ["Vigilar la erupción cutánea", ""]]
+    _, _, unidades = tabla_a_unidades(filas)
+    assert unidades == [("CON valproato", "Pauta: Adultos; Dosis: 25 mg"),
+                        ("", "Pauta: Vigilar la erupción cutánea")]
+
+
+# ---------------------------------------------------------------
+# unir_tablas_partidas
+# ---------------------------------------------------------------
+def _tabla(pagina, filas, y=(100, 700), x=(50, 550)):
+    return {"pagina": pagina, "alto": 800, "bbox": (x[0], y[0], x[1], y[1]), "filas": filas}
+
+
+def test_tabla_partida_hereda_el_encabezado():
+    # La dosis de la segunda parte no debe convertirse en el nombre de una columna
+    primera = _tabla(1, [["Pauta", "Dosis"], ["Monoterapia", "25 mg"]])
+    segunda = _tabla(2, [["Con valproato", "12,5 mg"], ["Sin valproato", "50 mg"]])
+    _, encabezado, unidades = tabla_a_unidades(unir_tablas_partidas([primera, segunda])[1]["filas"])
+    assert encabezado == ("Pauta", "Dosis")
+    assert unidades == [("", "Pauta: Con valproato; Dosis: 12,5 mg"), ("", "Pauta: Sin valproato; Dosis: 50 mg")]
+
+
+def test_tabla_partida_hereda_a_traves_de_varias_paginas():
+    tablas = [_tabla(1, [["Pauta", "Dosis"], ["a", "1 mg"]]), _tabla(2, [["b", "2 mg"]]), _tabla(3, [["c", "3 mg"]])]
+    assert unir_tablas_partidas(tablas)[2]["filas"] == [["Pauta", "Dosis"], ["c", "3 mg"]]
+
+
+def test_tabla_que_es_solo_encabezado_se_une_a_la_siguiente():
+    tablas = [_tabla(1, [["Pauta", "Dosis"]], y=(720, 750)), _tabla(2, [["a", "1 mg"]], y=(60, 400))]
+    unidas = unir_tablas_partidas(tablas)
+    assert len(unidas) == 1
+    assert unidas[0]["pagina"] == 2
+    assert unidas[0]["filas"] == [["Pauta", "Dosis"], ["a", "1 mg"]]
+
+
+def test_tabla_partida_que_repite_el_encabezado_no_lo_duplica():
+    tablas = [_tabla(1, [["Pauta", "Dosis"], ["a", "1 mg"]]), _tabla(2, [["Pauta ", "Dosis"], ["b", "2 mg"]])]
+    assert unir_tablas_partidas(tablas)[1]["filas"] == [["Pauta ", "Dosis"], ["b", "2 mg"]]
+
+
+def test_fila_de_datos_no_se_propaga_como_encabezado():
+    # "No conocida" se repite en su columna: es un dato, no el nombre de la columna
+    tablas = [_tabla(1, [["Anemia", "No conocida"], ["Mareo", "Rara"]]), _tabla(2, [["Cefalea", "No conocida"]])]
+    assert unir_tablas_partidas(tablas)[1]["filas"] == [["Cefalea", "No conocida"]]
+
+
+def test_tabla_final_de_celda_partida_no_es_una_seccion():
+    filas = [["Órgano", "Efecto"], ["el lugar de administración", ""], ["Piel", "erupción"]]
+    _, _, unidades = tabla_a_unidades(filas)
+    assert unidades == [("", "Órgano: el lugar de administración"), ("", "Órgano: Piel; Efecto: erupción")]
+
+
+def test_tabla_con_primera_fila_incompleta_no_propaga_su_encabezado():
+    tablas = [_tabla(1, [["Clase", ""], ["a", "b"]]), _tabla(2, [["c", "d"]])]
+    assert unir_tablas_partidas(tablas)[1]["filas"] == [["c", "d"]]
+
+
+@pytest.mark.parametrize("segunda", [
+    _tabla(3, [["c", "d"]]),                        # no es la página siguiente
+    _tabla(2, [["c", "d"]], y=(300, 700)),          # no empieza arriba
+    _tabla(2, [["c", "d"]], x=(50, 300)),           # otros bordes
+    _tabla(2, [["c", "d", "e"]]),                   # otras columnas
+])
+def test_tablas_distintas_no_se_unen(segunda):
+    assert unir_tablas_partidas([_tabla(1, [["a", "b"]]), segunda])[1]["filas"] == segunda["filas"]
+
+
+def test_recuadros_de_una_columna_no_se_unen():
+    # El texto de un recuadro no debe convertirse en el título de las dosis del siguiente
+    tablas = [_tabla(1, [["Esquizofrenia: 2 a 10 mg"]]), _tabla(2, [["Tics: 0,5 a 5 mg"], ["Huntington: 2 a 10 mg"]])]
+    unidas = unir_tablas_partidas(tablas)
+    assert len(unidas) == 2
+    assert unidas[1]["filas"] == [["Tics: 0,5 a 5 mg"], ["Huntington: 2 a 10 mg"]]
+
+
+def test_tabla_que_no_llega_al_pie_no_se_une():
+    tablas = [_tabla(1, [["a", "b"]], y=(100, 300)), _tabla(2, [["c", "d"]])]
+    assert unir_tablas_partidas(tablas)[1]["filas"] == [["c", "d"]]
 
 
 # ---------------------------------------------------------------
@@ -237,6 +333,28 @@ def test_abstencion_y_dosis_ausente_no_miden_relevancia():
     assert metricas_de(caso_ragas("dosis")) == ["fidelidad", "relevancia"]
 
 
+@pytest.mark.parametrize("respuesta", [
+    "El contexto no alcanza para responder.",
+    "El contexto proporcionado no contiene información sobre el uso de sertralina para la cefalea en racimos.",
+])
+def test_una_respuesta_que_solo_se_abstiene_no_mide_fidelidad(respuesta):
+    assert metricas_de(caso_ragas("abstencion", respuesta=respuesta)) == []
+    assert metricas_de(caso_ragas("dosis", respuesta=respuesta)) == ["relevancia"]
+
+
+def test_una_abstencion_con_cita_o_sin_la_frase_mide_fidelidad():
+    # Si cita algo o afirma algo sin citar, sí hay afirmaciones que verificar
+    con_cita = "El contexto no alcanza para responder sobre niños, pero la dosis es 50 mg [FT_Litio.pdf, página 3]."
+    assert metricas_de(caso_ragas("dosis", respuesta=con_cita)) == ["fidelidad", "relevancia"]
+    assert metricas_de(caso_ragas("dosis", respuesta="La dosis es 50 mg.")) == ["fidelidad", "relevancia"]
+
+
+def test_resumen_no_cuenta_la_fidelidad_guardada_de_una_abstencion():
+    respuesta = "El contexto no alcanza para responder."
+    resultados = {"¿P?": {"respuesta": respuesta, "metricas": {"fidelidad": 0.0, "relevancia": 0.0}}}
+    assert list(resumir([caso_ragas("dosis", respuesta=respuesta)], resultados)) == [("dosis", "relevancia")]
+
+
 def test_pendientes_retoma_donde_quedo():
     caso = caso_ragas()
     resultados = {"¿P?": {"respuesta": "R", "metricas": {"fidelidad": 0.5}}}
@@ -345,6 +463,19 @@ def test_generar_con_ollama_revisa_el_motivo_de_cierre(monkeypatch, motivo, espe
 # ---------------------------------------------------------------
 # evaluar_ragas.py: límites del proveedor
 # ---------------------------------------------------------------
+def test_cada_evaluador_tiene_su_archivo_de_resultados():
+    # El evaluador de por defecto conserva el archivo que ya existe
+    assert archivo_resultados(MODELO_EVALUADOR).name == "ragas.json"
+    assert archivo_resultados("otro-modelo").name == "ragas_otro-modelo.json"
+
+
+def test_guardar_escribe_solo_en_el_archivo_indicado(tmp_path):
+    archivo = tmp_path / "ragas_otro-modelo.json"
+    guardar({"pregunta": {"respuesta": "r", "metricas": {"fidelidad": 1.0}}}, archivo)
+    assert json.loads(archivo.read_text(encoding="utf-8"))["pregunta"]["metricas"]["fidelidad"] == 1.0
+    assert [p.name for p in tmp_path.iterdir()] == [archivo.name]   # no queda el temporal
+
+
 def test_espera_por_limite_no_espera_si_es_el_cupo_diario():
     # Fragmento real de un error 429 de Gemini
     mensaje = ("'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', "

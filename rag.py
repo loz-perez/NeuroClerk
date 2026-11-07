@@ -32,7 +32,7 @@ PROVEEDOR = "gemini"
 MODELOS = {
     "gemini": "gemini-3.5-flash-lite",
     "groq": "openai/gpt-oss-120b",
-    "ollama": "qwen3:8b",
+    "ollama": "gemma3:4b",
 }
 # La variable de entorno NEUROCLERK_MODELO permite usar otro modelo sin editar este archivo
 MODELO_LLM = os.environ.get("NEUROCLERK_MODELO") or MODELOS[PROVEEDOR]
@@ -49,7 +49,10 @@ MAX_FRAGMENTOS = 12            # tope de fragmentos que llegan al modelo
 MAX_POR_PAGINA = 2             # tope de fragmentos de una misma página (evita que una tabla copa todo)
 SIMILITUD_DUPLICADO = 0.5      # dos fragmentos de una página que comparten más de esto de sus palabras
                                # son casi el mismo texto (p. ej. un cuadro leído como texto y como tabla)
-VERSION_TEXTO = 3              # súbela cada vez que cambies cómo se extrae o divide el texto
+VERSION_TEXTO = 4              # súbela cada vez que cambies cómo se extrae o divide el texto
+PIE_DE_PAGINA = 0.80           # una tabla partida termina por debajo de esta altura de la página...
+CABEZA_DE_PAGINA = 0.20        # ...y sigue por encima de esta en la página siguiente
+TOLERANCIA_BORDES = 6          # puntos de diferencia admitidos entre los bordes de sus dos partes
 
 CARPETA_DATOS = "datos"
 CARPETA_DB = "chroma_db"       # aquí ChromaDB guarda los vectores en disco
@@ -136,10 +139,20 @@ def tabla_a_unidades(filas):
     if llenas >= 2 and llenas == len(cabecera) and resto:
         nombres = [limpiar(c) for c in cabecera]
         unidades = []
-        for f in resto:
+        seccion = ""
+        for i, f in enumerate(resto):
+            # Fila de sección: solo la primera celda tiene texto y debajo hay una fila con
+            # datos (p. ej. "Terapia CON valproato"). Acompaña a las filas que le siguen.
+            if limpiar(f[0]) and not any(limpiar(c) for c in f[1:]):
+                siguiente = resto[i + 1] if i + 1 < len(resto) else []
+                # En minúscula sería el final de una celda partida, no una sección
+                if sum(1 for c in siguiente if limpiar(c)) >= 2 and not limpiar(f[0])[0].islower():
+                    seccion = limpiar(f[0])
+                    continue
+                seccion = ""   # es una nota suelta, no pertenece a la sección anterior
             partes = [f"{n}: {limpiar(v)}" for n, v in zip(nombres, f) if limpiar(v)]
             if partes:
-                unidades.append(("", "; ".join(partes)))
+                unidades.append((seccion, "; ".join(partes)))
         return titulo, tuple(nombres), unidades
 
     # 3) Tipo lista: todos los elementos separados por comas
@@ -147,10 +160,50 @@ def tabla_a_unidades(filas):
     return titulo, None, [("", ", ".join(elementos))] if elementos else []
 
 
+def es_continuacion(previa, tabla):
+    """¿Es `tabla` la misma que `previa`, partida al cambiar de página?
+
+    Se reconoce por la posición: una termina al pie de su página, la otra empieza arriba
+    en la página siguiente, con las mismas columnas y los mismos bordes. Las de una sola
+    columna no cuentan: son recuadros de texto, sin encabezado que heredar.
+    """
+    return (len(tabla["filas"][0]) >= 2
+            and tabla["pagina"] == previa["pagina"] + 1
+            and previa["bbox"][3] > previa["alto"] * PIE_DE_PAGINA
+            and tabla["bbox"][1] < tabla["alto"] * CABEZA_DE_PAGINA
+            and abs(previa["bbox"][0] - tabla["bbox"][0]) <= TOLERANCIA_BORDES
+            and abs(previa["bbox"][2] - tabla["bbox"][2]) <= TOLERANCIA_BORDES
+            and len(previa["filas"][0]) == len(tabla["filas"][0]))
+
+
+def unir_tablas_partidas(tablas):
+    """Pone el encabezado a las tablas que siguen de la página anterior sin repetirlo.
+
+    Sin esto, tabla_a_unidades() tomaría la primera fila de datos como encabezado y cada
+    valor quedaría asociado a otra columna. Solo se hereda una primera fila completa cuyos
+    valores no se repitan en su propia columna: si no, seguramente es una fila de datos
+    (p. ej. "No conocida" en una columna de frecuencias), y es mejor no propagarla.
+    Si la tabla anterior era solo el encabezado, ya no hace falta y se quita.
+    """
+    unidas = []
+    for tabla in tablas:
+        previa = unidas[-1] if unidas else None
+        if previa and es_continuacion(previa, tabla):
+            cabecera = [limpiar(c) for c in previa["filas"][0]]
+            debajo = previa["filas"][1:] + tabla["filas"]
+            repetida = any(limpiar(c) == n for f in debajo for c, n in zip(f, cabecera))
+            propia = cabecera == [limpiar(c) for c in tabla["filas"][0]]   # la tabla repite su encabezado
+            if all(cabecera) and not propia and not repetida:
+                tabla = {**tabla, "filas": [previa["filas"][0]] + tabla["filas"]}
+                if len(previa["filas"]) == 1:
+                    unidas.pop()
+        unidas.append(tabla)
+    return unidas
+
+
 def cargar_tablas(ruta, tam=TAM_CHUNK):
     """Devuelve fragmentos de tablas; cada uno lleva delante el título (y la categoría)."""
-    fragmentos = []
-    ultimo_titulo, ultimo_encabezado = "", None
+    tablas = []
     with pdfplumber.open(ruta) as pdf:
         for numero, pagina in enumerate(pdf.pages, start=1):
             try:
@@ -159,26 +212,31 @@ def cargar_tablas(ruta, tam=TAM_CHUNK):
                 # (muchos PDFs tienen dos páginas del libro por hoja), y de arriba abajo
                 mitad = pagina.width / 2
                 encontradas.sort(key=lambda t: ((t.bbox[0] + t.bbox[2]) / 2 > mitad, t.bbox[1]))
-                tablas = [t.extract() for t in encontradas]
+                de_la_pagina = [{"pagina": numero, "alto": pagina.height, "bbox": t.bbox, "filas": t.extract()}
+                                for t in encontradas]
             except Exception:
                 continue   # alguna página rara no debe frenar todo
-            for filas in tablas:
-                titulo, encabezado, unidades = tabla_a_unidades(filas)
-                # Tabla que sigue de una página anterior: sin título pero con el mismo encabezado
-                if not titulo and encabezado and encabezado == ultimo_encabezado:
-                    titulo = f"{ultimo_titulo} (continuación)"
-                if titulo and encabezado:
-                    ultimo_titulo, ultimo_encabezado = titulo.replace(" (continuación)", ""), encabezado
-                for etiqueta, texto in unidades:
-                    palabras = texto.split()
-                    if len(palabras) < 3:
-                        continue   # celdas sueltas sin contenido útil
-                    prefijo = titulo or "Tabla"
-                    prefijo += f" — {etiqueta}: " if etiqueta else ": "
-                    # Unidades largas: se parten, pero cada trozo repite título y categoría
-                    for i in range(0, len(palabras), tam):
-                        trozo = " ".join(palabras[i:i + tam])
-                        fragmentos.append({"pagina": numero, "texto": prefijo + trozo})
+            tablas += [t for t in de_la_pagina if t["filas"]]
+
+    fragmentos = []
+    ultimo_titulo, ultimo_encabezado = "", None
+    for tabla in unir_tablas_partidas(tablas):
+        titulo, encabezado, unidades = tabla_a_unidades(tabla["filas"])
+        # Tabla que sigue de una página anterior: sin título pero con el mismo encabezado
+        if not titulo and encabezado and encabezado == ultimo_encabezado:
+            titulo = f"{ultimo_titulo} (continuación)"
+        if titulo and encabezado:
+            ultimo_titulo, ultimo_encabezado = titulo.replace(" (continuación)", ""), encabezado
+        for etiqueta, texto in unidades:
+            palabras = texto.split()
+            if len(palabras) < 3:
+                continue   # celdas sueltas sin contenido útil
+            prefijo = titulo or "Tabla"
+            prefijo += f" — {etiqueta}: " if etiqueta else ": "
+            # Unidades largas: se parten, pero cada trozo repite título y categoría
+            for i in range(0, len(palabras), tam):
+                trozo = " ".join(palabras[i:i + tam])
+                fragmentos.append({"pagina": tabla["pagina"], "texto": prefijo + trozo})
     return fragmentos
 
 

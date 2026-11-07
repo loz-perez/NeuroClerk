@@ -44,6 +44,8 @@ Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (ca
 
 `soap.py` estructura notas clínicas ficticias en SOAP y Examen del Estado Mental. Importarlo no tiene efectos; `estructurar()` exige `PROVEEDOR = "ollama"` salvo que se pase `permitir_nube=True` (solo para las notas de `pruebas/`). Las notas nunca van a `datos/`.
 
+Para leer una página puntual de un PDF del corpus, usar `read_document`; para recuperar una decisión anterior, `session_search`. Los plugins de DSH viven en el perfil `~/.dsh/profiles/desktop`, no en el repositorio; ver `docs/PLUGINS.md`.
+
 `rag.py` es el programa completo y está organizado en bloques numerados: 0 configuración, 1 carga de PDF (`pypdf`) y tablas (`pdfplumber`), 2 división, 3 indexación en ChromaDB, 4 `recuperar()`, 5 `responder()` y `generar()`, 6 bucle interactivo. Los parámetros se cambian en el bloque 0.
 
 **Importar `rag.py` no tiene efectos.** Solo define funciones y valores, y mantenerlo así permite probarlo sin el modelo ni la base. Quien lo use llama explícitamente a:

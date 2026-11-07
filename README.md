@@ -44,6 +44,7 @@ NeuroClerk/
 ├── evaluaciones/          # respuestas, Ragas y banco.sqlite, no se sube a Git
 ├── pruebas/               # notas clínicas ficticias, no se indexan
 ├── docs/ENTORNOS.md       # cómo está montado Windows + WSL
+├── docs/PLUGINS.md        # plugins de DSH que usa el proyecto
 ├── .vscode/               # intérprete y tareas para Remote-WSL
 ├── rag.py                 # el programa completo
 ├── probar_rag.py          # pruebas de búsqueda y respuesta

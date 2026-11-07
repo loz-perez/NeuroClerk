@@ -46,6 +46,16 @@ Una ventana de VS Code corre en un solo entorno: no se puede mezclar una carpeta
 
 Regla práctica: **una sola copia editable, la de WSL**. La planilla se abre desde Excel con `\\wsl.localhost\Ubuntu\home\justperez\neuroclerk\casos_de_prueba_NeuroClerk.xlsx`.
 
+## Plugins de DSH
+
+Los plugins del entorno están documentados en [PLUGINS.md](PLUGINS.md): Market, Session Search, `dsh-files` y el hub. Viven en `~/.dsh/profiles/desktop`, no en este repositorio.
+
+Los que se usan a diario:
+
+- **`read_document`**: leer páginas puntuales de `datos/` sin escribir scripts. Probado con `CIE-11.pdf`, página 504.
+- **`session_search`**: recuperar decisiones de sesiones anteriores del proyecto.
+- **`attachment_list` / `export_attachment`**: traer un archivo subido al workspace.
+
 ## Claves y variables
 
 Ya están en `~/.config/neuroclerk/env` (permisos 600) y `~/.bashrc` las carga en cada terminal. Para cambiarlas, editar ese archivo:

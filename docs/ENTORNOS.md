@@ -120,6 +120,7 @@ cd ~/neuroclerk
 | SOAP (5 notas ficticias) | 5/5 secciones, datos, examen mental y análisis con `gemma3:4b` |
 | `banco.py correr` | corrida #6: tabla 7/7, fuente 17/17, dosis 9/9, contexto 23/23 |
 | Ruff | `uvx ruff check .` sin avisos |
+| CI | GitHub Actions: pytest + Ruff en cada push |
 | Ollama `gemma3:4b` | consulta de litio en 35 s, con citas; 45/55 % CPU/GPU |
 | Gemini | la misma consulta en 17 s, con citas |
 

@@ -43,6 +43,7 @@ uvx ruff check .                       # estilo, imports y bugs simples
 - Fases: 1 ✅, 2 🔵 casi completa por el caso 13, 3 ✅, 4 ⚪ pendiente.
 - Ragas: pendiente de recalcular con las respuestas nuevas.
 - Ruff: `uvx ruff check .` pasa; reglas en `docs/ARQUITECTURA.md`.
+- CI: `.github/workflows/ci.yml` corre pytest y Ruff en cada push.
 - El registro corto de pendientes está en `TODO.md`.
 
 ## Arquitectura

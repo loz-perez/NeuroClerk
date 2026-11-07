@@ -73,6 +73,7 @@ Cualquier import nuevo entre módulos debe agregarse a esta tabla y a `test_arqu
 cd ~/neuroclerk
 uvx ruff check .                 # estilo, imports, bugs simples
 .venv/bin/python -m pytest -q    # unitarias + arquitectura
+# GitHub Actions corre ambos en cada push
 ```
 
 `test_arquitectura.py` falla si `rag.py` importa un módulo del proyecto, si `evaluar_ragas.py` importa el RAG o si alguien introduce un framework en el núcleo.

@@ -33,7 +33,7 @@ Registro corto de tareas pendientes. El contexto de cada fase está en `HOJA_DE_
 - [ ] **Guías de GuíaSalud y NICE**, si aportan respuestas que hoy no están cubiertas.
 - [ ] **Comparar el RAG propio con un framework** (LlamaIndex o LangChain), solo como evaluación, sin reemplazar el código actual.
 - [ ] **Revisar licencias** de YMRS y PANSS antes de cualquier uso compartido.
-- [ ] **Evaluar CI** para correr `pytest` y `ruff check` en cada push; hoy no hay CI.
+- [x] **CI** para correr `pytest` y `ruff check` en cada push. Agregado el 07/11/2026 en `.github/workflows/ci.yml`.
 
 ## Estado de partida
 

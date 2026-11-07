@@ -46,6 +46,7 @@ NeuroClerk/
 ├── docs/ENTORNOS.md       # cómo está montado Windows + WSL
 ├── docs/PLUGINS.md        # plugins de DSH que usa el proyecto
 ├── docs/ARQUITECTURA.md   # capas, dependencias y reglas de código
+├── .github/workflows/ci.yml  # pytest + Ruff en cada push
 ├── .vscode/               # intérprete y tareas para Remote-WSL
 ├── rag.py                 # el programa completo
 ├── probar_rag.py          # pruebas de búsqueda y respuesta
@@ -64,6 +65,7 @@ NeuroClerk/
 ├── fuentes.csv            # registro de los documentos de datos/
 ├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
 ├── pyproject.toml         # configuración de Ruff
+├── requirements-test.txt  # dependencias mínimas de pytest y Ruff para CI
 ├── requirements.txt       # librerías principales
 ├── requirements-lock.txt  # versiones exactas del entorno
 ├── requirements-ragas.txt # librerías de .venv-ragas
@@ -305,7 +307,7 @@ Variables de entorno opcionales: `SOLO_INDEXAR=1` indexa y termina, sin pedir la
 python -m pytest
 ```
 
-`uvx ruff check .` revisa estilo, imports y bugs simples. Está configurado en `pyproject.toml`; las reglas de arquitectura están en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
+`uvx ruff check .` revisa estilo, imports y bugs simples. Está configurado en `pyproject.toml`; las reglas de arquitectura están en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). En cada push, GitHub Actions corre `ruff check .` y `pytest` con `requirements-test.txt` (sin torch ni ChromaDB).
 
 `probar_rag.py` comprueba con 28 preguntas, de todos los tipos de documento, que la búsqueda encuentra las fuentes correctas y que el modelo las usa. Los casos también están en `casos_de_prueba_NeuroClerk.xlsx`, donde se anotan los resultados de cada ejecución.
 

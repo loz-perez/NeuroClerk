@@ -22,7 +22,7 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 | Componente | Elección | Por qué |
 | --- | --- | --- |
 | Lenguaje | Python 3.12 | Las versiones más nuevas todavía no tienen PyTorch disponible |
-| Modelo de lenguaje | `gemini-3.5-flash-lite` (nube); `openai/gpt-oss-120b` en Groq y `qwen3:8b` en Ollama como alternativas | Gemini responde en segundos y usa bien las tablas; Ollama queda para datos que no deben salir de la PC |
+| Modelo de lenguaje | `gemini-3.5-flash-lite` (nube); `openai/gpt-oss-120b` en Groq y `gemma3:4b` en Ollama (con 16 GB, `qwen3:8b`) como alternativas | Gemini responde en segundos y usa bien las tablas; Ollama queda para datos que no deben salir de la PC |
 | Modelo para las pruebas | `gemini-3.5-flash-lite` | Su cupo gratuito alcanzó para correr las 28 pruebas seguidas |
 | Framework RAG | Código propio en `rag.py` | Para aprender cómo funciona cada paso; un framework queda para más adelante |
 | Embeddings | `intfloat/multilingual-e5-base` | Lee unas 300 palabras por fragmento; MiniLM solo leía unas 80 |
@@ -33,6 +33,7 @@ La búsqueda corre siempre en local. La respuesta la redacta un modelo gratuito 
 | Evaluación | Ragas 0.4.3 en `evaluar_ragas.py`, con su propio entorno (`.venv-ragas`) | Mide fidelidad y relevancia; aparte, porque exige LangChain y `openai` 1.x, y así la aplicación sigue sin framework |
 | Interfaz | Terminal; Streamlit en la fase 4 | Para probar sin depender de una interfaz |
 | Control de versiones | Git y GitHub (repositorio público), una rama por función | Para volver a una versión que funciona si algo se rompe |
+| Entorno | Windows + VS Code Remote-WSL; ejecución en Ubuntu 26.04 (WSL2) | La edición queda en Windows y la ejecución pesada en Linux; ver `docs/ENTORNOS.md` |
 
 ## Fases
 

@@ -10,30 +10,31 @@ El estado de cada fase y los próximos pasos están en `HOJA_DE_RUTA.md`; qué d
 
 ## Comandos
 
-Python 3.12, en Windows con PowerShell. Sin activar el entorno, usar `.venv\Scripts\python.exe` en lugar de `python`.
+El repositorio canónico vive en WSL (`~/neuroclerk`); la copia de Windows es un respaldo congelado. Desde la terminal de VS Code Remote-WSL, sin activar el entorno, usar `.venv/bin/python` en lugar de `python`.
 
-```powershell
-python .\rag.py                  # indexa lo que falte y abre la consulta interactiva ("salir" para terminar)
-python .\revisar_datos.py        # revisa datos/ antes de indexar (escaneados, fuentes.csv, duplicados)
-python .\descargar_fichas.py     # descarga de CIMA las fichas que falten y actualiza fuentes.csv
+```bash
+.venv/bin/python rag.py                 # indexa lo que falte y abre la consulta interactiva
+.venv/bin/python revisar_datos.py       # revisa datos/ antes de indexar
+.venv/bin/python descargar_fichas.py    # descarga de CIMA las fichas que falten
 
-python -m pytest                                      # pruebas unitarias de las funciones puras (test_rag.py)
-python -m pytest test_rag.py::test_parecido_es_la_proporcion_de_palabras_compartidas   # una sola prueba
+.venv/bin/python -m pytest              # pruebas unitarias (test_rag.py y test_banco.py)
+.venv/bin/python -m pytest test_rag.py::test_parecido_es_la_proporcion_de_palabras_compartidas
 
-python .\probar_rag.py --verificar                    # revisa que los casos estén bien armados
-python .\probar_rag.py                                # los 28 casos, solo búsqueda (no llama al modelo)
-python .\probar_rag.py --llm                          # además pide las respuestas (28 peticiones, gasta cupo)
-python .\probar_rag.py --llm --modelo NOMBRE --pausa 15
-python .\probar_rag.py --buscar PALABRA [ARCHIVO]     # qué fragmentos contienen una palabra
-python .\probar_rag.py --ranking "PREGUNTA" ARCHIVO   # qué filtro deja afuera a un fragmento
+.venv/bin/python probar_rag.py --verificar
+.venv/bin/python probar_rag.py
+.venv/bin/python probar_rag.py --llm
+.venv/bin/python probar_rag.py --llm --modelo NOMBRE --pausa 15
+.venv/bin/python probar_rag.py --buscar PALABRA [ARCHIVO]
+.venv/bin/python probar_rag.py --ranking "PREGUNTA" ARCHIVO
+.venv/bin/python banco.py correr
+.venv/bin/python panel.py               # http://localhost:8765
 
-.venv\Scripts\python.exe probar_rag.py --llm --exportar   # guarda las respuestas en evaluaciones/respuestas.json
-.venv-ragas\Scripts\python.exe evaluar_ragas.py [--limite N] [--modelo NOMBRE] [--resumen]   # fidelidad y relevancia con Ragas
+.venv-ragas/bin/python evaluar_ragas.py [--limite N] [--modelo NOMBRE] [--resumen]
 ```
 
-`evaluar_ragas.py` corre siempre en `.venv-ragas` (`requirements-ragas.txt`): Ragas arrastra LangChain y baja `openai` a 1.x, y `rag.py` usa 3.x. No instalarlo en `.venv`, no importarlo desde `rag.py` ni importar `rag.py` desde `evaluar_ragas.py`; se comunican por el JSON. `test_rag.py` importa sus funciones puras, así que Ragas debe seguir importándose solo dentro de `evaluar()`.
+`evaluar_ragas.py` corre siempre en `.venv-ragas` (`requirements-ragas.txt`): Ragas arrastra LangChain y su propio stack de `openai`, distinto del de `rag.py`. No instalarlo en `.venv`, no importarlo desde `rag.py` ni importar `rag.py` desde `evaluar_ragas.py`; se comunican por el JSON. `test_rag.py` importa sus funciones puras, así que Ragas debe seguir importándose solo dentro de `evaluar()`. Cada evaluador guarda sus puntajes por separado: el de por defecto en `evaluaciones/ragas.json` y los demás en `evaluaciones/ragas_MODELO.json`.
 
-`test_rag.py` corre sin el modelo, la base, los PDFs ni claves. `probar_rag.py` mide la búsqueda y las respuestas, necesita `datos/` y `chroma_db/`, que no están en Git, y no tiene una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. No hay linter ni CI.
+`test_rag.py` y `test_banco.py` corren sin el modelo, la base, los PDFs ni claves. `probar_rag.py` mide la búsqueda y las respuestas, necesita `datos/` y `chroma_db/`, que no están en Git, y no tiene una opción para correr un solo caso: para investigar uno, usar `--ranking` y `--buscar`. No hay linter ni CI.
 
 Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (cambia el modelo sin editar el código), `SOLO_INDEXAR=1` (indexa y termina), `HF_HUB_OFFLINE=0` (permite descargar el modelo de embeddings; por defecto `rag.py` trabaja sin conexión).
 
@@ -54,7 +55,7 @@ Variables de entorno: `GEMINI_API_KEY` / `GROQ_API_KEY`, `NEUROCLERK_MODELO` (ca
 
 **Recuperación.** Se buscan candidatos por separado en cada archivo, para que el DSM-5-TR no acapare los resultados, con un cupo proporcional al tamaño (`CUPO`, de 3 a 15). Luego se aplican, en orden: margen de similitud respecto al mejor, máximo por página, descarte de casi duplicados de la misma página (Jaccard, sin contar el prefijo común, porque las filas de una tabla repiten el título) y tope total. Los embeddings e5 requieren los prefijos `passage:` y `query:`.
 
-**Tablas.** `tabla_a_unidades()` distingue tres formas: por categorías, por filas y tipo lista. Cada fragmento lleva el título delante, y las continuaciones lo heredan.
+**Tablas.** `tabla_a_unidades()` distingue tres formas: por categorías, por filas y tipo lista. Cada fragmento lleva el título delante, y las continuaciones lo heredan. Las filas de sección acompañan a las filas siguientes como etiqueta. `unir_tablas_partidas()` da el encabezado de la página anterior a las tablas que siguen sin repetirlo; se reconocen por su posición en la página (`es_continuacion()`).
 
 **Relación entre `rag.py` y `probar_rag.py`.** Cambiar uno de estos puntos puede romper las pruebas sin que se note a simple vista:
 

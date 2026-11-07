@@ -37,36 +37,45 @@ flowchart LR
 
 ```text
 NeuroClerk/
-├── .venv/                 # entorno virtual (no se sube a Git)
-├── datos/                 # tus PDFs (no se suben a Git)
-├── chroma_db/             # vectores guardados (no se sube a Git)
+├── .venv/                 # entorno Linux (Python 3.12), no se sube a Git
+├── .venv-ragas/           # entorno de Ragas, no se sube a Git
+├── datos/                 # PDFs, no se suben a Git
+├── chroma_db/             # vectores guardados, no se sube a Git
+├── evaluaciones/          # respuestas, Ragas y banco.sqlite, no se sube a Git
+├── docs/ENTORNOS.md       # cómo está montado Windows + WSL
+├── .vscode/               # intérprete y tareas para Remote-WSL
 ├── rag.py                 # el programa completo
-├── probar_rag.py          # pruebas automáticas de búsqueda y respuesta
-├── probar_tablas.py       # prueba anterior; sus 7 casos ya están en probar_rag.py
+├── probar_rag.py          # pruebas de búsqueda y respuesta
+├── probar_tablas.py       # prueba anterior; sus 7 casos están en probar_rag.py
 ├── test_rag.py            # pruebas unitarias de las funciones puras (pytest)
-├── evaluar_ragas.py       # mide con Ragas las respuestas exportadas (entorno aparte)
-├── .venv-ragas/           # entorno de Ragas (no se sube a Git)
-├── evaluaciones/          # respuestas exportadas y resultados (no se suben a Git)
-├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
+├── test_banco.py          # pruebas de banco.py (pytest)
+├── banco.py               # compara configuraciones de la búsqueda
+├── panel.py               # panel web de las corridas del banco
+├── evaluar_ragas.py       # fidelidad y relevancia con Ragas (entorno aparte)
 ├── descargar_fichas.py    # descarga las fichas técnicas de CIMA
 ├── revisar_datos.py       # revisa la carpeta datos/ antes de indexar
 ├── fuentes.csv            # registro de los documentos de datos/
-├── DATOS.md               # qué documentos poner en datos/ y dónde conseguirlos
+├── casos_de_prueba_NeuroClerk.xlsx  # casos de prueba y resultados
 ├── requirements.txt       # librerías principales
-├── requirements-lock.txt  # versiones exactas de todo el entorno
+├── requirements-lock.txt  # versiones exactas del entorno
 ├── requirements-ragas.txt # librerías de .venv-ragas
-├── .gitignore
-├── CLAUDE.md              # guía para trabajar en el proyecto con Claude Code
+├── BANCO.md               # cómo medir y comparar configuraciones
+├── DATOS.md               # qué documentos poner en datos/ y dónde conseguirlos
 ├── HOJA_DE_RUTA.md
-└── README.md
+├── README.md
+└── CLAUDE.md              # guía para trabajar en el proyecto con Claude Code
 ```
+
+## Entorno híbrido (WSL)
+
+En este equipo el repositorio canónico vive en WSL (`~/neuroclerk`) y se edita con VS Code desde Windows mediante *Remote - WSL*; `C:\Users\loren\dev\NeuroClerk` queda como respaldo congelado. La indexación, las pruebas, el banco, el panel, Ragas y Ollama corren en WSL. Los comandos para abrir las dos ventanas y dónde van las claves están en [docs/ENTORNOS.md](docs/ENTORNOS.md).
 
 ## Requisitos
 
 - Windows 10/11 (también funciona en macOS y Linux cambiando los comandos de activación).
 - **Python 3.12.** Las versiones más nuevas pueden no tener todavía PyTorch disponible.
 - Una clave gratuita de Gemini o Groq, o bien [Ollama](https://ollama.com) instalado para usar un modelo local.
-- Para el modelo local, unos 16 GB de RAM con `qwen3:8b` (con 8 GB, usa `gemma3:4b`).
+- Para el modelo local, `gemma3:4b` funciona con unos 8 GB de RAM; `qwen3:8b` necesita unos 16 GB.
 - VS Code con la extensión Python (opcional, pero recomendado).
 
 ## Instalación
@@ -128,7 +137,7 @@ En el bloque 0 de `rag.py`, `PROVEEDOR` elige quién redacta la respuesta:
 | --- | --- | --- | --- | --- |
 | `"gemini"` (por defecto) | `gemini-3.5-flash-lite` | Plan gratuito | Rápido | Límite de peticiones por día; en el plan gratuito, Google puede usar lo enviado para mejorar sus productos |
 | `"groq"` | `openai/gpt-oss-120b` | Plan gratuito | Muy rápido | Límite de 8.000 tokens por minuto: alcanza para 1 o 2 preguntas por minuto |
-| `"ollama"` | `qwen3:8b` | Gratis | Lento en CPU | Nada sale de la computadora |
+| `"ollama"` | `gemma3:4b` | Gratis | Lento en CPU | Nada sale de la computadora |
 
 Los proveedores en la nube solo reciben la pregunta y los fragmentos encontrados, nunca los PDFs completos. Aun así, **no los uses con datos de pacientes**: para eso está `"ollama"`.
 
@@ -302,6 +311,10 @@ La medición anterior a la última dio 13/17 en respuesta. El caso que se sumó 
 
 El detalle de cada caso y la evolución entre versiones están en la hoja de cálculo. Después de cada cambio en la extracción o la búsqueda, vuelve a correr las pruebas, anota el resultado en la hoja *Historial* y en el mensaje del commit.
 
+### Banco de pruebas
+
+`banco.py` compara configuraciones de la búsqueda sobre los mismos 28 casos, guarda cada corrida en `evaluaciones/banco.sqlite` y muestra qué casos mejoran o empeoran; `panel.py` lo publica en `http://localhost:8765`. Sin `--llm` no llama al modelo. El detalle está en [BANCO.md](BANCO.md).
+
 ### Evaluación con Ragas
 
 `evaluar_ragas.py` complementa a `probar_rag.py` con dos medidas de [Ragas](https://docs.ragas.io/) que no necesitan una respuesta de referencia:
@@ -309,7 +322,7 @@ El detalle de cada caso y la evolución entre versiones están en la hoja de cá
 - **Fidelidad:** qué proporción de lo que afirma la respuesta está respaldada por los fragmentos.
 - **Relevancia:** cuánto contesta la respuesta lo que se preguntó. Sirve para comparar casos y versiones, no como valor absoluto: en una prueba, una respuesta sin ninguna relación con la pregunta sacó 0.49. No se mide en los casos en los que lo correcto es no responder.
 
-Ragas corre en un entorno aparte, porque exige LangChain y una versión de `openai` más vieja que la de `rag.py`. La aplicación no lo usa ni lo importa.
+Ragas corre en un entorno aparte, porque exige LangChain y su propio stack de `openai`, distinto del que usa `rag.py`. La aplicación no lo usa ni lo importa.
 
 ```powershell
 py -3.12 -m venv .venv-ragas
@@ -320,9 +333,14 @@ py -3.12 -m venv .venv-ragas
 .venv-ragas\Scripts\python.exe evaluar_ragas.py --limite 5   # solo 5 evaluaciones nuevas
 .venv-ragas\Scripts\python.exe evaluar_ragas.py --resumen    # muestra lo ya evaluado, sin pedir nada
 .venv-ragas\Scripts\python.exe evaluar_ragas.py --modelo gemini-3.1-flash-lite   # otro evaluador
+.venv-ragas\Scripts\python.exe evaluar_ragas.py --modelo gemini-3.1-flash-lite --resumen   # lo evaluado por él
 ```
 
-El programa envía como máximo 12 peticiones por minuto al modelo, y ante un límite por minuto espera lo que pide el proveedor. Si se agota el cupo diario, se detiene: cada modelo tiene su propio cupo, así que `--modelo` permite seguir, pero los puntajes de evaluadores distintos no son del todo comparables.
+El programa envía como máximo 12 peticiones por minuto al modelo, y ante un límite por minuto espera lo que pide el proveedor. Si se agota el cupo diario, se detiene: cada modelo tiene su propio cupo.
+
+Cada evaluador guarda sus puntajes por separado, porque los de evaluadores distintos no son del todo comparables: el de por defecto en `evaluaciones/ragas.json` y los demás en `evaluaciones/ragas_MODELO.json`. Por eso `--modelo` empieza desde cero con un evaluador nuevo y no sirve para completar lo que otro dejó pendiente.
+
+La fidelidad no se mide cuando la respuesta solo se abstiene (dice que no puede responder y no cita nada), porque no hay afirmaciones que verificar y el puntaje depende de cómo lo interprete cada evaluador. La relevancia sí se mide en esas respuestas, salvo en los casos donde abstenerse es lo correcto, y sirve para señalar abstenciones que no deberían haber ocurrido.
 
 Cada resultado se guarda al obtenerlo: si se agota el cupo, volver a correrlo sigue donde quedó. Una respuesta que cambió se vuelve a evaluar. `evaluaciones/` no se sube a Git porque contiene texto de los PDFs.
 

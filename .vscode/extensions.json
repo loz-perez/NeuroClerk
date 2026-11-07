@@ -1,6 +1,11 @@
 {
-  "recommendations": [
-    "GitHub.copilot",
-    "GitHub.copilot-chat"
-  ]
+    "recommendations": [
+        "ms-vscode-remote.remote-wsl",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "ms-toolsai.jupyter",
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+    ]
 }

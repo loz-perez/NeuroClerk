@@ -1,0 +1,108 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Indexar PDFs",
+            "detail": "Indexa en WSL lo que falte en datos/ (descarga el modelo si hace falta)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "rag.py"
+            ],
+            "options": {
+                "env": {
+                    "SOLO_INDEXAR": "1",
+                    "HF_HUB_OFFLINE": "0"
+                }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Consultar (rag.py)",
+            "detail": "Abre la consulta interactiva en la terminal de WSL",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "rag.py"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Pytest",
+            "detail": "Pruebas unitarias de las funciones puras",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "-m",
+                "pytest",
+                "-q"
+            ],
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Verificar casos",
+            "detail": "Comprueba que los 28 casos estén bien armados",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "probar_rag.py",
+                "--verificar"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Probar búsqueda",
+            "detail": "Los 28 casos, solo búsqueda (no llama al modelo)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "probar_rag.py"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Probar respuestas (--llm)",
+            "detail": "Los 28 casos con respuesta del modelo (gasta cupo)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "probar_rag.py",
+                "--llm"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Banco (búsqueda)",
+            "detail": "Mide la configuración actual y la guarda en evaluaciones/banco.sqlite",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "banco.py",
+                "correr"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Panel",
+            "detail": "Sirve el panel en http://localhost:8765 (dejarlo corriendo)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "panel.py"
+            ],
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Ragas (pendientes)",
+            "detail": "Evalúa con Ragas las respuestas exportadas (gasta cupo)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv-ragas/bin/python",
+            "args": [
+                "evaluar_ragas.py"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

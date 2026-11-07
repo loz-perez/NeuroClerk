@@ -442,6 +442,9 @@ def responder(pregunta):
         "- Después de cada afirmación, indica entre corchetes el archivo y la página.\n"
         "- Ignora los fragmentos que no tengan relación con la pregunta.\n"
         "- Si varios fragmentos aportan datos distintos sobre el tema, inclúyelos todos.\n"
+        "- No inventes dosis: la dosis que des debe estar escrita textualmente en un fragmento que cites, con su unidad.\n"
+        "- Una dosis solo vale para el fármaco, la indicación, la edad y la vía que indica el fragmento; no la traslades a otro uso.\n"
+        "- Si el contexto no trae la dosis para ese fármaco, esa edad o ese uso, dilo; no la aproximes ni la calcules.\n"
         "- Si el contexto no alcanza para responder, dilo.\n\n"
         f"Contexto:\n{contexto}\n\nPregunta: {pregunta}\n\nRespuesta en español:"
     )

@@ -31,7 +31,7 @@ flowchart LR
 3. **Dividir:** parte el texto en fragmentos de 200 palabras que se solapan 40, para no cortar una idea a la mitad.
 4. **Indexar:** convierte cada fragmento en un vector y lo guarda en ChromaDB. Solo se hace la primera vez, o cuando un PDF es nuevo o cambió. Cada PDF se reconoce por una huella de su contenido, así que la base se puede indexar en otra computadora (por ejemplo, en Colab).
 5. **Recuperar:** busca los fragmentos más parecidos de **cada** archivo (3 en una ficha corta, hasta 15 en un libro) y descarta los que quedan muy por debajo del mejor.
-6. **Generar:** le pasa esos fragmentos al modelo con instrucciones de responder solo con el contexto y citar cada afirmación. La respuesta se muestra solo si el modelo confirma que terminó, y los errores pasajeros del proveedor se reintentan solos.
+6. **Generar:** le pasa esos fragmentos al modelo con instrucciones de responder solo con el contexto y citar cada afirmación. La respuesta se muestra solo si el modelo confirma que terminó, y los errores pasajeros del proveedor se reintentan solos. No da ninguna dosis que no esté escrita textualmente en un fragmento que cite.
 
 ## Estructura del proyecto
 
@@ -291,7 +291,7 @@ Para cada pregunta mide:
 - **Fuente:** si aparece alguna fuente válida: la tabla, la ficha técnica, el DSM, la CIE-11, la guía o la escala que corresponda.
 - **Respuesta:** si la respuesta nombra las palabras clave. En los casos 1, 2, 3 y 7 son fármacos que figuran **solo en la tabla** y en ninguna de las fichas, así que nombrarlos prueba que el modelo usó la tabla.
 - **Abstención:** en dos preguntas cuya respuesta no está en los documentos (la dosis de esketamina y la capital de Uruguay), si el sistema se niega a responder en lugar de inventar.
-- **Dosis:** en 9 casos aparte, si da la dosis que está en los documentos, o ninguna cuando el fármaco está pero no hay dosis para ese uso (niños, indicación no autorizada). En el caso del zolpidem en niños puede citar la dosis de un estudio, siempre que deje claro que el uso no se recomienda.
+- **Dosis:** en 9 casos aparte, si da la dosis que está en los documentos, o ninguna cuando el fármaco está pero no hay dosis para ese uso (niños, indicación no autorizada). En el caso del zolpidem en niños puede citar la dosis de un estudio, siempre que deje claro que el uso no se recomienda. Desde el 07/11/2026 el prompt prohíbe dar dosis que no estén textuales en un fragmento citado; la regla no cambió los totales.
 - **Respaldo:** en cualquier respuesta, si todas sus dosis aparecen en los fragmentos usados. No detecta una dosis que está en los fragmentos, pero corresponde a otro fármaco o a otro uso: las respuestas de los casos de dosis se muestran para revisarlas a mano.
 
 Los avisos del proveedor (límite alcanzado, servidor caído, respuesta incompleta) se cuentan como errores y no como fallos.

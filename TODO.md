@@ -19,7 +19,7 @@ Registro corto de tareas pendientes. El contexto de cada fase está en `HOJA_DE_
 
 ## Entorno e infraestructura
 
-- [ ] **Resolver el desfase de dependencias.** `requirements-lock.txt` fija `torch+cpu`, pero el `.venv` de WSL tiene `torch+cu126` para reindexar. Decidir si se crea un `requirements-gpu.txt` o se documenta como ajuste local.
+- [x] **Resolver el desfase de dependencias.** `requirements-lock.txt` queda como lock CPU portable y se agregó `requirements-gpu.txt` para WSL (`torch+cu126`, `triton` y `nvidia-*`).
 - [ ] **Decidir el respaldo CPU de 300 MB.** `~/chroma_db_cpu_backup_20261107` ya no es la base activa; conservarlo solo si se van a comparar tiempos.
 - [ ] **Revisar `.claude/`.** Solo contiene `scheduled_tasks.lock`; borrarlo si no se usan tareas programadas de Claude Code.
 - [ ] **Revisar el worktree de prueba.** `/home/justperez/neuroclerk-otra-rama` se puede eliminar con `git worktree remove` si ya no se usa.

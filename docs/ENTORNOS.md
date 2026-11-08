@@ -145,7 +145,14 @@ HF_HUB_OFFLINE=1 SOLO_INDEXAR=1 .venv/bin/python rag.py
 
 La muestra se armó con dos fragmentos por documento (texto y tabla) y se midió con el mismo lote en los tres entornos. El parseo es el mismo en CPU y GPU; por eso la ganancia de extremo a extremo (3,3-3,8×) es menor que la de los embeddings (6,3×).
 
-El lock sigue con `torch==2.14.1+cpu`: esta máquina quedó con CUDA para reindexar. Para volver al entorno reproducible del lock, reinstalar desde `requirements-lock.txt`; para conservar GPU, anotar el índice `cu126` al reinstalar.
+El lock base `requirements-lock.txt` queda en CPU para Windows, Colab y CI. En WSL, el `.venv` usa CUDA y se instala encima `requirements-gpu.txt` (`torch 2.14.1+cu126`, `triton 3.8.0` y los `nvidia-*`). Para recrear el entorno de WSL:
+
+```bash
+uv pip install --python .venv/bin/python -r requirements-lock.txt
+uv pip install --python .venv/bin/python -r requirements-gpu.txt
+```
+
+Para un entorno solo CPU, alcanza con `requirements-lock.txt`.
 
 ## Problemas frecuentes
 

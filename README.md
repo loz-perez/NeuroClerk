@@ -66,7 +66,8 @@ NeuroClerk/
 ├── pyproject.toml         # configuración de Ruff
 ├── requirements-test.txt  # dependencias mínimas de pytest y Ruff para CI
 ├── requirements.txt       # librerías principales
-├── requirements-lock.txt  # versiones exactas del entorno
+├── requirements-lock.txt  # versiones exactas del entorno (CPU)
+├── requirements-gpu.txt   # overlay CUDA para WSL (torch cu126 + nvidia)
 ├── requirements-ragas.txt # librerías de .venv-ragas
 ├── BANCO.md               # cómo medir y comparar configuraciones
 ├── DATOS.md               # qué documentos poner en datos/ y dónde conseguirlos
@@ -123,7 +124,8 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
 
 ### Mantener las dependencias
 
-- `requirements.txt` tiene solo las librerías principales; `requirements-lock.txt`, las versiones exactas de todo el entorno.
+- `requirements.txt` tiene solo las librerías principales; `requirements-lock.txt`, las versiones exactas del entorno CPU.
+- `requirements-gpu.txt` es el overlay para Linux/WSL: fija `torch+cu126`, `triton` y los paquetes `nvidia-*`. Se instala **después** del lock CPU y no se usa en Windows.
 - **Cada vez que instales una librería nueva**, regenera el lock en ese momento:
 
   ```powershell
@@ -138,7 +140,7 @@ En VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → el que dice `.
 
 ### Por qué PyTorch CPU
 
-PyTorch solo calcula los embeddings, y gracias a ChromaDB eso pesa únicamente al indexar. La respuesta la genera el modelo de lenguaje, que no depende de PyTorch. La versión CPU pesa ~200 MB frente a más de 2 GB, y no depende de tener una tarjeta NVIDIA. Para indexar rápido, usa Colab o WSL con GPU (ver [Indexar en la nube](#indexar-en-la-nube-colab)). En este equipo, el `.venv` de WSL tiene `torch 2.14.1+cu126` para reindexar; el lock sigue en CPU (ver [docs/ENTORNOS.md](docs/ENTORNOS.md)).
+PyTorch solo calcula los embeddings, y gracias a ChromaDB eso pesa únicamente al indexar. La respuesta la genera el modelo de lenguaje, que no depende de PyTorch. La versión CPU pesa ~200 MB frente a más de 2 GB, y no depende de tener una tarjeta NVIDIA. Para indexar rápido, usa Colab o WSL con GPU (ver [Indexar en la nube](#indexar-en-la-nube-colab)). En este equipo, el `.venv` de WSL tiene `torch 2.14.1+cu126` para reindexar y coincide con `requirements-gpu.txt`. El lock base queda en CPU para Windows, Colab y CI; en WSL se instala encima el overlay (ver [docs/ENTORNOS.md](docs/ENTORNOS.md)).
 
 ## Modelo de lenguaje: local o en la nube
 

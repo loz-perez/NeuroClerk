@@ -9,7 +9,7 @@ Este archivo es para el agente DSH que trabaja en NeuroClerk. `CLAUDE.md` sigue 
 - El repositorio canónico vive en **WSL**: `~/neuroclerk` (Ubuntu 26.04, Python 3.12).
 - `C:\Users\loren\dev\NeuroClerk` es un **respaldo congelado**; no se edita ni se ejecuta desde ahí.
 - Todo se ejecuta en WSL con `.venv/bin/python`; VS Code se usa desde Windows con *Remote - WSL*.
-- La GPU es una RTX 3050 de 4 GB; `torch 2.14.1+cu126` está instalado en `.venv`.
+- La GPU es una RTX 3050 de 4 GB; `torch 2.14.1+cu126` está instalado en `.venv`, con el overlay `requirements-gpu.txt`.
 - Las claves están en `~/.config/neuroclerk/env`; no van al repositorio.
 - WSL **no tiene credenciales de GitHub**. Para publicar, generar un bundle en WSL, hacer `fetch` y `push` desde Windows, que sí tiene el credential manager.
 
